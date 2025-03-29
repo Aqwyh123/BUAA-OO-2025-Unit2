@@ -20,19 +20,18 @@ public class Elevator implements Runnable {
     private static final String initialFloor = "F1";
     private static final boolean initialDoorState = false;
     public static final int ratedLoad = 6;
-    private static final double ratedSpeed = 0.4;
-    private static final double minPauseTime = 0.4;
+    private static final long ratedSpeed = (long) (0.4 * 1000);
 
     private final int id;
     private int position;
-    private boolean doorState;
+    private final Door door;
     private final Scheduler scheduler;
     private final LinkedBlockingQueue<Response> responseQueue = new LinkedBlockingQueue<>();
 
     public Elevator(int id, PriorityBlockingQueue<Request> waitingQueue) {
         this.id = id;
         this.position = availablePositions.get(initialFloor);
-        this.doorState = initialDoorState;
+        this.door = new Door(initialDoorState);
         this.scheduler = new Scheduler(position, waitingQueue, responseQueue);
     }
 
@@ -52,18 +51,17 @@ public class Elevator implements Runnable {
         }
     }
 
-    private boolean execute(Response response) throws InterruptedException {
+    private boolean execute(Response response) {
         if (response instanceof MoveResponse) {
             MoveResponse moveResponse = (MoveResponse) response;
-            if (doorState) {
+            if (door.getState()) {
+                door.close();
                 TimableOutput.println(String.format("CLOSE-%s-%d",
                         availableFloors.get(position), id));
-                Thread.sleep((long) (minPauseTime * 1000));
-                doorState = false; /* TODO */
             }
             int targetPosition = moveResponse.getDirection() ? position + 1 : position - 1;
             try {
-                Thread.sleep((long) (ratedSpeed * 1000));
+                Thread.sleep(ratedSpeed);
                 TimableOutput.println(String.format("ARRIVE-%s-%d",
                         availableFloors.get(targetPosition), id));
             } catch (InterruptedException e) {
@@ -72,20 +70,20 @@ public class Elevator implements Runnable {
             position = targetPosition;
         } else if (response instanceof LoadResponse) {
             LoadResponse loadResponse = (LoadResponse) response;
-            if (!doorState) {
+            if (!door.getState()) {
+                door.open();
                 TimableOutput.println(String.format("OPEN-%s-%d",
                         availableFloors.get(position), id));
-                doorState = true;  /* TODO */
             }
             TimableOutput.println(String.format("IN-%d-%s-%d",
                     ((PersonRequest) loadResponse.getRequest()).getPersonId(),
                     availableFloors.get(position), id));
         } else if (response instanceof UnloadResponse) {
             UnloadResponse unloadResponse = (UnloadResponse) response;
-            if (!doorState) {
+            if (!door.getState()) {
+                door.open();
                 TimableOutput.println(String.format("OPEN-%s-%d",
                         availableFloors.get(position), id));
-                doorState = true;  /* TODO */
             }
             TimableOutput.println(String.format("OUT-%d-%s-%d",
                     ((PersonRequest) unloadResponse.getRequest()).getPersonId(),
