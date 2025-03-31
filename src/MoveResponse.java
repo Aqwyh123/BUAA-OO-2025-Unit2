@@ -1,11 +1,11 @@
 public class MoveResponse implements Response {
-    private final boolean direction;
+    private final int direction;
 
-    public MoveResponse(boolean direction) {
+    public MoveResponse(int direction) {
         this.direction = direction;
     }
 
-    public boolean getDirection() {
+    public int getDirection() {
         return direction;
     }
 }

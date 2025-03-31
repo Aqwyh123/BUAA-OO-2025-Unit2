@@ -5,11 +5,10 @@ import java.util.HashMap;
 import java.util.concurrent.PriorityBlockingQueue;
 
 public class Dispatcher implements Runnable {
-    private final PriorityBlockingQueue<Request> scanningQueue;
-    private final HashMap<Integer, PriorityBlockingQueue<Request>> elevatorQueues;
+    private final RequestQueue scanningQueue;
+    private final HashMap<Integer, RequestQueue> elevatorQueues;
 
-    Dispatcher(PriorityBlockingQueue<Request> scanningQueue,
-               HashMap<Integer, PriorityBlockingQueue<Request>> elevatorQueues) {
+    Dispatcher(RequestQueue scanningQueue, HashMap<Integer, RequestQueue> elevatorQueues) {
         this.scanningQueue = scanningQueue;
         this.elevatorQueues = elevatorQueues;
     }

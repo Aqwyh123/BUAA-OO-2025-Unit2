@@ -1,113 +1,117 @@
 import com.oocourse.elevator1.PersonRequest;
 import com.oocourse.elevator1.Request;
 
-import java.util.Iterator;
-import java.util.PriorityQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.PriorityBlockingQueue;
+import java.util.ArrayList;
 
 public class Scheduler implements Runnable {
     private int position;
-    private boolean direction;
-    private boolean taking;
-    private boolean ended;
-    private final PriorityBlockingQueue<Request> waitingQueue;
-    private final PriorityQueue<Request> takingQueue;
-    private final LinkedBlockingQueue<Response> responseQueue;
+    private int direction;
+    private final RequestQueue waitingQueue;
+    private final ProcessingQueue takingQueue;
+    private final ResponseQueue actingQueue;
 
-    public Scheduler(int initialPosition, PriorityBlockingQueue<Request> waitingQueue,
-                     LinkedBlockingQueue<Response> responseQueue) {
+    public Scheduler(int initialPosition, RequestQueue waitingQueue, ResponseQueue actingQueue) {
         this.position = initialPosition;
-        this.direction = true;
-        this.taking = false;
-        this.ended = false;
+        this.direction = 0;
         this.waitingQueue = waitingQueue;
-        this.takingQueue = new PriorityQueue<>(new PriorityComparator());
-        this.responseQueue = responseQueue;
+        this.takingQueue = new ProcessingQueue();
+        this.actingQueue = actingQueue;
     }
 
     @Override
     public void run() {
-        while (true) {
-            load();
-            unload();
-            if (takingQueue.isEmpty() && ended) {
-                responseQueue.offer(new StopResponse());
-                break;
-            } else if (!takingQueue.isEmpty() || taking) {
-                move();
-            }
-        }
-    }
-
-    private void load() {
-        if (takingQueue.isEmpty()) {
-            Request request = waitingQueue.peek();
-            if (request == null) {
-                return;
-            }
-            if (request instanceof PersonRequest) {
-                PersonRequest personRequest = (PersonRequest) request;
-                int fromPosition = Elevator.availablePositions.get(personRequest.getFromFloor());
-                int toPosition = Elevator.availablePositions.get(personRequest.getToFloor());
-                boolean fromDirection = fromPosition >= position;
-                boolean toDirection = toPosition >= position;
-                if (position != fromPosition) {
-                    direction = fromDirection;
-                    taking = true;
-                } else {
-                    responseQueue.offer(new LoadResponse(request));
-                    waitingQueue.poll();
-                    takingQueue.add(request);
-                    direction = toDirection;
-                    taking = false;
+        ProcessingQueue bufferingQueue = new ProcessingQueue();
+        ArrayList<Request> checkingQueue = new ArrayList<>();
+        do {
+            while (!takingQueue.isEmpty()) {
+                Request request = takingQueue.peek();
+                if (!unload(request)) {
+                    checkingQueue.add(takingQueue.poll());
                 }
-            } else {
-                waitingQueue.poll();
-                takingQueue.add(request);
             }
-        } else if (takingQueue.size() < Elevator.ratedLoad) {
-            Iterator<Request> iterator = waitingQueue.iterator();
-            while (iterator.hasNext()) {
-                Request request = iterator.next();
-                if (request instanceof PersonRequest) {
-                    PersonRequest personRequest = (PersonRequest) request;
-                    int fromPosition = Elevator.availablePositions.get(personRequest.getFromFloor());
-                    int toPosition = Elevator.availablePositions.get(personRequest.getToFloor());
-                    boolean toDirection = toPosition >= position;
-                    if (fromPosition == position && toDirection == direction) {
-                        responseQueue.offer(new LoadResponse(request));
-                        iterator.remove();
-                        takingQueue.add(request);
+            takingQueue.addAll(checkingQueue);
+            checkingQueue.clear();
+
+            if (takingQueue.isEmpty() && waitingQueue.isEmpty()) {
+                direction = 0;
+            } else if (!takingQueue.isEmpty()) {
+                PersonRequest personRequest = (PersonRequest) takingQueue.peek();
+                int toPosition = Elevator.POSITIONS.get(personRequest.getToFloor());
+                direction = Integer.signum(toPosition - position);
+            } else if (waitingQueue.peek() instanceof NullRequest) {
+                direction = 0;
+            } else {
+                PersonRequest personRequest = (PersonRequest) waitingQueue.peek();
+                int fromPosition = Elevator.POSITIONS.get(personRequest.getFromFloor());
+                int toPosition = Elevator.POSITIONS.get(personRequest.getToFloor());
+                if (fromPosition == position) {
+                    direction = Integer.signum(toPosition - position);
+                } else {
+                    direction = Integer.signum(fromPosition - position);
+                }
+            }
+
+            if (takingQueue.size() < Elevator.ratedLoad) {
+                if (takingQueue.isEmpty()) {
+                    try {
+                        bufferingQueue.add(waitingQueue.take());
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
                     }
-                } else {
-                    iterator.remove();
-                    takingQueue.add(request);
+                }
+                waitingQueue.drainTo(bufferingQueue);
+                while (!bufferingQueue.isEmpty() && takingQueue.size() < Elevator.ratedLoad) {
+                    Request request = bufferingQueue.poll();
+                    if (load(request)) {
+                        PersonRequest personRequest = (PersonRequest) takingQueue.peek();
+                        int toPosition = Elevator.POSITIONS.get(personRequest.getToFloor());
+                        direction = Integer.signum(toPosition - position);
+                    } else {
+                        waitingQueue.put(request);
+                    }
                 }
             }
-        }
+        } while (move());
     }
 
-    private void unload() {
-        Iterator<Request> iterator = takingQueue.iterator();
-        while (iterator.hasNext()) {
-            Request request = iterator.next();
-            if (request instanceof PersonRequest) {
-                PersonRequest personRequest = (PersonRequest) request;
-                int targetPosition = Elevator.availablePositions.get(personRequest.getToFloor());
-                if (targetPosition == position) {
-                    responseQueue.offer(new UnloadResponse(request));
-                    iterator.remove();
-                }
-            } else {
-                iterator.remove();
-                ended = true;
+    private boolean load(Request request) {
+        if (request instanceof PersonRequest) {
+            PersonRequest personRequest = (PersonRequest) request;
+            int fromPosition = Elevator.POSITIONS.get(personRequest.getFromFloor());
+            int toPosition = Elevator.POSITIONS.get(personRequest.getToFloor());
+            int reqDir = toPosition - position;
+            if (fromPosition == position && (takingQueue.isEmpty() || reqDir * direction >= 0)) {
+                actingQueue.offer(new LoadResponse(request));
+                takingQueue.add(request);
+                return true;
             }
         }
+        return false;
     }
 
-    private void move() {
-        responseQueue.offer(new MoveResponse(direction));
-        this.position = direction ? position + 1 : position - 1;
+    private boolean unload(Request request) {
+        if (request instanceof PersonRequest) {
+            PersonRequest personRequest = (PersonRequest) request;
+            int toPosition = Elevator.POSITIONS.get(personRequest.getToFloor());
+            if (toPosition == position) {
+                actingQueue.offer(new UnloadResponse(request));
+                takingQueue.remove(request);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean move() {
+        if (waitingQueue.peek() instanceof NullRequest && takingQueue.isEmpty()) {
+            actingQueue.offer(new StopResponse());
+            return false;
+        } else {
+            if (direction != 0) {
+                actingQueue.offer(new MoveResponse(direction));
+                this.position = position + direction;
+            }
+            return true;
+        }
     }
 }
