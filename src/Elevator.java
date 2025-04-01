@@ -27,7 +27,7 @@ public class Elevator implements Runnable {
     public Elevator(int id, RequestQueue waitingQueue) {
         this.id = id;
         this.position = POSITIONS.get(initialFloor);
-        this.door = new Door(initialDoorState);
+        this.door = new Door(id, initialDoorState);
         this.scheduler = new Scheduler(position, waitingQueue, responseQueue);
     }
 
@@ -50,28 +50,25 @@ public class Elevator implements Runnable {
     private boolean execute(Response response) {
         if (response instanceof MoveResponse) {
             MoveResponse moveResponse = (MoveResponse) response;
-            if (door.close()) {
-                TimableOutput.println(String.format("CLOSE-%s-%d", FLOORS.get(position), id));
-            }
-            int toPosition = position + moveResponse.getDirection();
+            door.close(FLOORS.get(position));
             LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(ratedSpeed));
+            int toPosition = position + moveResponse.getDirection();
             TimableOutput.println(String.format("ARRIVE-%s-%d", FLOORS.get(toPosition), id));
             position = toPosition;
         } else if (response instanceof LoadResponse) {
             LoadResponse loadResponse = (LoadResponse) response;
-            if (door.open()) {
-                TimableOutput.println(String.format("OPEN-%s-%d", FLOORS.get(position), id));
-            }
+            door.open(FLOORS.get(position));
             int personId = ((PersonRequest) loadResponse.getRequest()).getPersonId();
             TimableOutput.println(String.format("IN-%d-%s-%d", personId, FLOORS.get(position), id));
         } else if (response instanceof UnloadResponse) {
             UnloadResponse unloadResponse = (UnloadResponse) response;
-            if (door.open()) {
-                TimableOutput.println(String.format("OPEN-%s-%d", FLOORS.get(position), id));
-            }
+            door.open(FLOORS.get(position));
             int personId = ((PersonRequest) unloadResponse.getRequest()).getPersonId();
             TimableOutput.println(String.format("OUT-%d-%s-%d", personId, FLOORS.get(position), id));
+        } else if (response instanceof StopResponse) {
+            door.close(FLOORS.get(position));
+            return false;
         }
-        return !(response instanceof StopResponse);
+        return true;
     }
 }

@@ -1,34 +1,37 @@
-import java.util.concurrent.TimeUnit;
+import com.oocourse.elevator1.TimableOutput;
+
 import java.util.concurrent.locks.LockSupport;
 
 public class Door {
+    private final int id;
     private static final long minPauseTime = (long) (0.4 * 1000);
-    private long openNanoTime;
+    private long openTime;
     private boolean doorState;
 
-    public Door(boolean initialState) {
-        this.openNanoTime = System.nanoTime();
+    public Door(int id, boolean initialState) {
+        this.id = id;
+        this.openTime = System.currentTimeMillis();
         this.doorState = initialState;
     }
 
-    public boolean open() {
+    public void open(String floor) {
         if (doorState) {
-            return false;
+            return;
         }
+        TimableOutput.println(String.format("OPEN-%s-%d", floor, id));
+        openTime = System.currentTimeMillis();
         doorState = true;
-        openNanoTime = System.nanoTime();
-        return true;
     }
 
-    public boolean close() {
+    public void close(String floor) {
         if (!doorState) {
-            return false;
-        }
-        long pauseNanoTime = TimeUnit.MILLISECONDS.toNanos(minPauseTime) - (System.nanoTime() - openNanoTime);
-        if (pauseNanoTime > 0) {
-            LockSupport.parkNanos(pauseNanoTime);
+            return;
         }
         doorState = false;
-        return true;
+        long pauseTime = minPauseTime - (System.currentTimeMillis() - openTime);
+        if (pauseTime > 0) {
+            LockSupport.parkNanos(pauseTime* 1_000_000);
+        }
+        TimableOutput.println(String.format("CLOSE-%s-%d", floor, id));
     }
 }
