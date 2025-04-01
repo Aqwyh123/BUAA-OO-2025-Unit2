@@ -1,7 +1,7 @@
-public class MoveResponse implements Response {
+public class TurnTask implements Task {
     private final int direction;
 
-    public MoveResponse(int direction) {
+    public TurnTask(int direction) {
         this.direction = direction;
     }
 

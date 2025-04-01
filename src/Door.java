@@ -14,6 +14,10 @@ public class Door {
         this.doorState = initialState;
     }
 
+    public boolean getState() {
+        return doorState;
+    }
+
     public void open(String floor) {
         if (doorState) {
             return;
@@ -30,7 +34,7 @@ public class Door {
         doorState = false;
         long pauseTime = minPauseTime - (System.currentTimeMillis() - openTime);
         if (pauseTime > 0) {
-            LockSupport.parkNanos(pauseTime* 1_000_000);
+            LockSupport.parkNanos(pauseTime * 1_000_000);
         }
         TimableOutput.println(String.format("CLOSE-%s-%d", floor, id));
     }

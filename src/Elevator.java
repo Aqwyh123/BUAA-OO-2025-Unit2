@@ -1,7 +1,9 @@
 import com.oocourse.elevator1.PersonRequest;
+import com.oocourse.elevator1.Request;
 import com.oocourse.elevator1.TimableOutput;
 
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Collections;
@@ -11,34 +13,38 @@ import java.util.stream.Collectors;
 
 public class Elevator implements Runnable {
     public static final int[] IDS = {1, 2, 3, 4, 5, 6};
-    public static final List<String> FLOORS = Collections.unmodifiableList(Arrays.asList("B4", "B3", "B2", "B1", "F1", "F2", "F3", "F4", "F5", "F6", "F7"));
-    public static final Map<String, Integer> POSITIONS = Collections.unmodifiableMap(FLOORS.stream().collect(Collectors.toMap(floor -> floor, FLOORS::indexOf)));
-    public static final String initialFloor = "F1";
-    public static final boolean initialDoorState = false;
-    public static final int ratedLoad = 6;
-    private static final long ratedSpeed = (long) (0.4 * 1000);
+    public static final List<String> FLOORS = Collections.unmodifiableList(
+        Arrays.asList("B4", "B3", "B2", "B1", "F1", "F2", "F3", "F4", "F5", "F6", "F7"));
+    public static final Map<String, Integer> POSITIONS = Collections.unmodifiableMap(
+        FLOORS.stream().collect(Collectors.toMap(floor -> floor, FLOORS::indexOf)));
+    private static final String INITIAL_FLOOR = "F1";
+    private static final boolean INITIAL_STATE = false;
+    private static final long RATED_SPEED = (long) (0.4 * 1000);
+    public static final int RATED_LOAD = 6;
 
     private final int id;
     private int position;
+    private int direction;
     private final Door door;
-    private final Scheduler scheduler;
-    private final ResponseQueue responseQueue = new ResponseQueue();
+    private final RequestQueue waitingQueue;
+    private final ProcessingQueue takingQueue;
 
     public Elevator(int id, RequestQueue waitingQueue) {
         this.id = id;
-        this.position = POSITIONS.get(initialFloor);
-        this.door = new Door(id, initialDoorState);
-        this.scheduler = new Scheduler(position, waitingQueue, responseQueue);
+        this.position = POSITIONS.get(INITIAL_FLOOR);
+        this.direction = 0;
+        this.door = new Door(id, INITIAL_STATE);
+        this.waitingQueue = waitingQueue;
+        this.takingQueue = new ProcessingQueue();
     }
 
     @Override
     public void run() {
-        Thread schedulerThread = new Thread(scheduler);
-        schedulerThread.start();
         while (true) {
             try {
-                Response action = responseQueue.take();
-                if (!execute(action)) {
+                Task task = Scheduler.getTask(position, direction, door.getState(),
+                    waitingQueue, takingQueue);
+                if (!execute(task)) {
                     break;
                 }
             } catch (InterruptedException e) {
@@ -47,26 +53,41 @@ public class Elevator implements Runnable {
         }
     }
 
-    private boolean execute(Response response) {
-        if (response instanceof MoveResponse) {
-            MoveResponse moveResponse = (MoveResponse) response;
-            door.close(FLOORS.get(position));
-            LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(ratedSpeed));
-            int toPosition = position + moveResponse.getDirection();
-            TimableOutput.println(String.format("ARRIVE-%s-%d", FLOORS.get(toPosition), id));
-            position = toPosition;
-        } else if (response instanceof LoadResponse) {
-            LoadResponse loadResponse = (LoadResponse) response;
+    private boolean execute(Task task) {
+        if (task instanceof OpenTask) {
             door.open(FLOORS.get(position));
-            int personId = ((PersonRequest) loadResponse.getRequest()).getPersonId();
-            TimableOutput.println(String.format("IN-%d-%s-%d", personId, FLOORS.get(position), id));
-        } else if (response instanceof UnloadResponse) {
-            UnloadResponse unloadResponse = (UnloadResponse) response;
-            door.open(FLOORS.get(position));
-            int personId = ((PersonRequest) unloadResponse.getRequest()).getPersonId();
-            TimableOutput.println(String.format("OUT-%d-%s-%d", personId, FLOORS.get(position), id));
-        } else if (response instanceof StopResponse) {
+        } else if (task instanceof CloseTask) {
             door.close(FLOORS.get(position));
+        } else if (task instanceof InTask) {
+            ArrayList<Request> inQueue = ((InTask) task).getIn();
+            for (Request request : inQueue) {
+                if (request instanceof PersonRequest) {
+                    PersonRequest personRequest = (PersonRequest) request;
+                    int personId = personRequest.getPersonId();
+                    TimableOutput.println(String.format("OUT-%d-%s-%d", personId,
+                        FLOORS.get(position), id));
+                }
+            }
+            waitingQueue.removeAll(inQueue);
+            takingQueue.addAll(inQueue);
+        } else if (task instanceof OutTask) {
+            ArrayList<Request> outQueue = ((OutTask) task).getOut();
+            for (Request request : outQueue) {
+                if (request instanceof PersonRequest) {
+                    PersonRequest personRequest = (PersonRequest) request;
+                    int personId = personRequest.getPersonId();
+                    TimableOutput.println(String.format("IN-%d-%s-%d", personId,
+                        FLOORS.get(position), id));
+                }
+            }
+            takingQueue.removeAll(outQueue);
+        } else if (task instanceof MoveTask) {
+            LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(RATED_SPEED));
+            position = position + direction;
+            TimableOutput.println(String.format("ARRIVE-%s-%d", FLOORS.get(position), id));
+        } else if (task instanceof TurnTask) {
+            direction = ((TurnTask) task).getDirection();
+        } else if (task instanceof StopTask) {
             return false;
         }
         return true;
