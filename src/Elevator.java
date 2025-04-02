@@ -64,7 +64,7 @@ public class Elevator implements Runnable {
                 if (request instanceof PersonRequest) {
                     PersonRequest personRequest = (PersonRequest) request;
                     int personId = personRequest.getPersonId();
-                    TimableOutput.println(String.format("OUT-%d-%s-%d", personId,
+                    TimableOutput.println(String.format("IN-%d-%s-%d", personId,
                         FLOORS.get(position), id));
                 }
             }
@@ -76,7 +76,7 @@ public class Elevator implements Runnable {
                 if (request instanceof PersonRequest) {
                     PersonRequest personRequest = (PersonRequest) request;
                     int personId = personRequest.getPersonId();
-                    TimableOutput.println(String.format("IN-%d-%s-%d", personId,
+                    TimableOutput.println(String.format("OUT-%d-%s-%d", personId,
                         FLOORS.get(position), id));
                 }
             }

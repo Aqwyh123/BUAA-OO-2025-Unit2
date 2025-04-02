@@ -5,9 +5,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 
 public class Scheduler {
-    public static Task getTask(int position, int direction, boolean state, RequestQueue waitingQueue, ProcessingQueue takingQueue) throws InterruptedException {
+    public static Task getTask(int position, int direction, boolean state,
+        RequestQueue waitingQueue, ProcessingQueue takingQueue) throws InterruptedException {
         if (state) {
-            if (hasOut(position, takingQueue)) {
+            if (isEnd(waitingQueue, takingQueue)) {
+                return new CloseTask();
+            } else if (hasOut(position, takingQueue)) {
                 return new OutTask(getOut(position, takingQueue));
             } else if (hasIn(position, direction, waitingQueue, takingQueue)) {
                 return new InTask(getIn(position, direction, takingQueue.size(), waitingQueue));
@@ -36,7 +39,8 @@ public class Scheduler {
         }
     }
 
-    private static boolean isEnd(RequestQueue waitingQueue, ProcessingQueue takingQueue) throws InterruptedException {
+    private static boolean isEnd(RequestQueue waitingQueue, ProcessingQueue takingQueue)
+        throws InterruptedException {
         if (!takingQueue.isEmpty()) {
             return false;
         } else if (!waitingQueue.isEmpty() && !(waitingQueue.peek() instanceof NullRequest)) {
@@ -69,7 +73,8 @@ public class Scheduler {
         }
     }
 
-    private static boolean hasIn(int position, int direction, RequestQueue waitingQueue, ProcessingQueue takingQueue) {
+    private static boolean hasIn(int position, int direction,
+        RequestQueue waitingQueue, ProcessingQueue takingQueue) {
         if (takingQueue.size() >= Elevator.RATED_LOAD) {
             return false;
         }
@@ -99,7 +104,8 @@ public class Scheduler {
         return false;
     }
 
-    private static ArrayList<Request> getIn(int position, int direction, int size, RequestQueue waitingQueue) {
+    private static ArrayList<Request> getIn(int position, int direction, int size,
+        RequestQueue waitingQueue) {
         ArrayList<Request> inQueue = new ArrayList<>();
         Request[] waitingList = waitingQueue.toArray(new Request[0]);
         Arrays.sort(waitingList, RequestComparator.priorityComparator);
@@ -120,7 +126,7 @@ public class Scheduler {
     }
 
     private static ArrayList<Request> getOut(int position, ProcessingQueue takingQueue) {
-        ArrayList<Request> unloadingQueue = new ArrayList<>();
+        ArrayList<Request> outQueue = new ArrayList<>();
         Request[] takingList = takingQueue.toArray(new Request[0]);
         Arrays.sort(takingList, RequestComparator.priorityComparator);
         for (Request request : takingList) {
@@ -128,10 +134,10 @@ public class Scheduler {
                 PersonRequest personRequest = (PersonRequest) request;
                 int toPosition = Elevator.POSITIONS.get(personRequest.getToFloor());
                 if (toPosition == position) {
-                    unloadingQueue.add(request);
+                    outQueue.add(request);
                 }
             }
         }
-        return unloadingQueue;
+        return outQueue;
     }
 }
