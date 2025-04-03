@@ -1,5 +1,4 @@
 import com.oocourse.elevator2.PersonRequest;
-import com.oocourse.elevator2.Request;
 import com.oocourse.elevator2.ScheRequest;
 import com.oocourse.elevator2.TimableOutput;
 
@@ -85,8 +84,12 @@ public class Elevator implements Runnable {
         return TimableOutput.println(content);
     }
 
-    private void redispatch(Request request) {
-        dispatchingQueue.put(request);
+    private void redispatch(PersonRequest request) {
+        String fromFloor = Elevator.FLOORS.get(position);
+        String toFloor = request.getToFloor();
+        int personId = request.getPersonId();
+        int priority = request.getPriority();
+        dispatchingQueue.put(new PersonRequest(fromFloor, toFloor, personId, priority));
         barrier.reset();
     }
 
@@ -142,7 +145,7 @@ public class Elevator implements Runnable {
             lock.unlock();
             waitingQueue.forEach(request -> {
                 if (request instanceof PersonRequest) {
-                    redispatch(request);
+                    redispatch((PersonRequest) request);
                 }
             });
             waitingQueue.removeIf(request -> request instanceof PersonRequest);
