@@ -9,15 +9,15 @@ public class Scheduler {
         RequestQueue waitingQueue, ProcessingQueue takingQueue) {
         if (state) {
             if (takingQueue.isEmpty() && waitingQueue.isEmpty() && waitingQueue.isEnd()) {
-                return new CloseTask();
+                return new CloseTask(Elevator.MIN_DOOR_PAUSE_TIME);
             } else if (waitingQueue.peek() instanceof ScheRequest) {
-                return new CloseTask();
+                return new CloseTask(Elevator.MIN_DOOR_PAUSE_TIME);
             } else if (hasOut(position, takingQueue)) {
                 return new OutTask(getOut(position, takingQueue));
             } else if (hasIn(position, direction, waitingQueue, takingQueue)) {
                 return new InTask(getIn(position, direction, takingQueue.size(), waitingQueue));
             } else {
-                return new CloseTask();
+                return new CloseTask(Elevator.MIN_DOOR_PAUSE_TIME);
             }
         } else {
             if (takingQueue.isEmpty() && waitingQueue.isEmpty() && waitingQueue.isEnd()) {
