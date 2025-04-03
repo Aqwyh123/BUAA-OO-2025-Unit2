@@ -59,6 +59,9 @@ public class Elevator implements Runnable {
             if (waitingQueue.isEmpty() && takingQueue.isEmpty()) {
                 try {
                     barrier.await();
+                    if (doorState) {
+                        execute(new CloseTask());
+                    }
                     break;
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
@@ -83,7 +86,6 @@ public class Elevator implements Runnable {
         String toFloor = request.getToFloor();
         int personId = request.getPersonId();
         int priority = request.getPriority();
-        TimableOutput.println(String.format("REDISPATCH-%d-%d", personId, id));
         dispatchingQueue.put(new PersonRequest(fromFloor, toFloor, personId, priority));
         barrier.reset();
     }
