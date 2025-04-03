@@ -5,9 +5,9 @@ import com.oocourse.elevator2.TimableOutput;
 
 import java.util.Arrays;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Collections;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
@@ -103,9 +103,8 @@ public class Elevator implements Runnable {
             doorState = false;
         } else if (task instanceof InTask) {
             ArrayList<PersonRequest> inQueue = ((InTask) task).getIn();
-            for (PersonRequest request : inQueue) {
-                int personId = request.getPersonId();
-                output(String.format("IN-%d-%s-%d", personId, FLOORS.get(position), id));
+            for (PersonRequest req : inQueue) {
+                output(String.format("IN-%d-%s-%d", req.getPersonId(), FLOORS.get(position), id));
             }
             waitingQueue.removeAll(inQueue);
             takingQueue.addAll(inQueue);
@@ -113,8 +112,7 @@ public class Elevator implements Runnable {
             ArrayList<PersonRequest> outQueue = ((OutTask) task).getOut();
             for (PersonRequest request : outQueue) {
                 int personId = request.getPersonId();
-                int toPosition = POSITIONS.get(request.getToFloor());
-                if (position == toPosition) {
+                if (position == POSITIONS.get(request.getToFloor())) {
                     output(String.format("OUT-S-%d-%s-%d", personId, FLOORS.get(position), id));
                 } else {
                     output(String.format("OUT-F-%d-%s-%d", personId, FLOORS.get(position), id));
@@ -142,6 +140,12 @@ public class Elevator implements Runnable {
             execute(new CloseTask());
             output(String.format("SCHE-END-%d", id));
             lock.unlock();
+            waitingQueue.forEach(request -> {
+                if (request instanceof PersonRequest) {
+                    redispatch(request);
+                }
+            });
+            waitingQueue.removeIf(request -> request instanceof PersonRequest);
             waitingQueue.remove(scheRequest);
         }
         return !(task instanceof StopTask);
