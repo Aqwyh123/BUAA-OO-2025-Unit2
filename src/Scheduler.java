@@ -3,40 +3,29 @@ import com.oocourse.elevator2.Request;
 import com.oocourse.elevator2.ScheRequest;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 
 public class Scheduler {
     public static Task getTask(int position, int direction, boolean state,
         RequestQueue waitingQueue, ProcessingQueue takingQueue) {
         if (state) {
-            if (takingQueue.isEmpty() && !waitingQueue.isEmpty() &&
-                waitingQueue.peek() instanceof EndRequest) {
+            if (takingQueue.isEmpty() && waitingQueue.isEmpty() && waitingQueue.isEnd()) {
+                return new CloseTask();
+            } else if (waitingQueue.peek() instanceof ScheRequest) {
                 return new CloseTask();
             } else if (hasOut(position, takingQueue)) {
                 return new OutTask(getOut(position, takingQueue));
-            } else if (waitingQueue.peek() instanceof ScheRequest) {
-                if (!takingQueue.isEmpty()) {
-                    return new OutTask(new ArrayList<>(takingQueue));
-                } else {
-                    return new CloseTask();
-                }
             } else if (hasIn(position, direction, waitingQueue, takingQueue)) {
                 return new InTask(getIn(position, direction, takingQueue.size(), waitingQueue));
             } else {
                 return new CloseTask();
             }
         } else {
-            if (takingQueue.isEmpty() && !waitingQueue.isEmpty() &&
-                waitingQueue.peek() instanceof EndRequest) {
+            if (takingQueue.isEmpty() && waitingQueue.isEmpty() && waitingQueue.isEnd()) {
                 return new StopTask();
+            } else if (waitingQueue.peek() instanceof ScheRequest) {
+                return new ScheTask((ScheRequest) waitingQueue.peek());
             } else if (hasOut(position, takingQueue)) {
                 return new OpenTask();
-            } else if (waitingQueue.peek() instanceof ScheRequest) {
-                if (!takingQueue.isEmpty()) {
-                    return new OpenTask();
-                } else {
-                    return new ScheTask((ScheRequest) waitingQueue.peek());
-                }
             } else if (direction == 0) {
                 return new TurnTask(getNewDirection(position, waitingQueue));
             } else if (hasIn(position, direction, waitingQueue, takingQueue)) {
@@ -101,8 +90,7 @@ public class Scheduler {
     private static ArrayList<PersonRequest> getIn(int position, int direction, int size,
         RequestQueue waitingQueue) {
         ArrayList<PersonRequest> inQueue = new ArrayList<>();
-        Request[] waitingList = waitingQueue.toArray(new Request[0]);
-        Arrays.sort(waitingList, RequestComparator.priorityComparator);
+        Request[] waitingList = waitingQueue.toArray();
         for (Request request : waitingList) {
             if (size + inQueue.size() >= Elevator.RATED_LOAD) {
                 break;
@@ -121,8 +109,7 @@ public class Scheduler {
 
     private static ArrayList<PersonRequest> getOut(int position, ProcessingQueue takingQueue) {
         ArrayList<PersonRequest> outQueue = new ArrayList<>();
-        Request[] takingList = takingQueue.toArray(new Request[0]);
-        Arrays.sort(takingList, RequestComparator.priorityComparator);
+        Request[] takingList = takingQueue.toArray();
         for (Request request : takingList) {
             if (request instanceof PersonRequest) {
                 PersonRequest personRequest = (PersonRequest) request;

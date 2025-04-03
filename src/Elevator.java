@@ -56,23 +56,17 @@ public class Elevator implements Runnable {
     @Override
     public void run() {
         while (true) {
-            try {
-                if (waitingQueue.isEmpty() && takingQueue.isEmpty()) {
+            if (waitingQueue.isEmpty() && takingQueue.isEmpty()) {
+                try {
                     barrier.await();
                     break;
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                } catch (BrokenBarrierException ignored) {
+                    continue;
                 }
-                Task task = Scheduler.getTask(position, direction, doorState,
-                    waitingQueue, takingQueue);
-                boolean shouldContinue = execute(task);
-                if (!shouldContinue) {
-                    barrier.await();
-                    break;
-                }
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            } catch (BrokenBarrierException ignored) {
-                continue;
             }
+            execute(Scheduler.getTask(position, direction, doorState, waitingQueue, takingQueue));
         }
     }
 
@@ -89,11 +83,12 @@ public class Elevator implements Runnable {
         String toFloor = request.getToFloor();
         int personId = request.getPersonId();
         int priority = request.getPriority();
+        TimableOutput.println(String.format("REDISPATCH-%d-%d", personId, id));
         dispatchingQueue.put(new PersonRequest(fromFloor, toFloor, personId, priority));
         barrier.reset();
     }
 
-    private boolean execute(Task task) {
+    private void execute(Task task) {
         if (task instanceof OpenTask) {
             lastOpenTime = output(String.format("OPEN-%s-%d", FLOORS.get(position), id));
             doorState = true;
@@ -119,7 +114,6 @@ public class Elevator implements Runnable {
                     output(String.format("OUT-S-%d-%s-%d", personId, FLOORS.get(position), id));
                 } else {
                     output(String.format("OUT-F-%d-%s-%d", personId, FLOORS.get(position), id));
-                    redispatch(request);
                 }
             }
             takingQueue.removeAll(outQueue);
@@ -130,27 +124,36 @@ public class Elevator implements Runnable {
         } else if (task instanceof TurnTask) {
             direction = ((TurnTask) task).getDirection();
         } else if (task instanceof ScheTask) {
-            ScheRequest scheRequest = ((ScheTask) task).getRequest();
             lock.lock();
-            output(String.format("SCHE-BEGIN-%d", id));
-            int toPosition = POSITIONS.get(scheRequest.getToFloor());
-            direction = Integer.signum(toPosition - position);
-            while (position != toPosition) {
-                execute(new MoveTask((long) (scheRequest.getSpeed() * 1000)));
-            }
-            execute(new OpenTask());
-            delay(SCHE_STOP_TIME);
-            execute(new CloseTask());
-            output(String.format("SCHE-END-%d", id));
+            executeScheTask(((ScheTask) task).getRequest());
             lock.unlock();
-            waitingQueue.forEach(request -> {
-                if (request instanceof PersonRequest) {
-                    redispatch((PersonRequest) request);
-                }
-            });
-            waitingQueue.removeIf(request -> request instanceof PersonRequest);
-            waitingQueue.remove(scheRequest);
         }
-        return !(task instanceof StopTask);
+    }
+
+    private void executeScheTask(ScheRequest scheRequest) {
+        execute(new OutTask(new ArrayList<>(takingQueue)));
+        takingQueue.forEach(personRequest -> {
+            if (position != POSITIONS.get(personRequest.getToFloor())) {
+                redispatch(personRequest);
+            }
+        });
+        takingQueue.clear();
+        output(String.format("SCHE-BEGIN-%d", id));
+        int toPosition = POSITIONS.get(scheRequest.getToFloor());
+        execute(new TurnTask(Integer.signum(toPosition - position)));
+        while (position != toPosition) {
+            execute(new MoveTask((long) (scheRequest.getSpeed() * 1000)));
+        }
+        execute(new OpenTask());
+        delay(SCHE_STOP_TIME);
+        execute(new CloseTask());
+        output(String.format("SCHE-END-%d", id));
+        waitingQueue.forEach(request -> {
+            if (request instanceof PersonRequest) {
+                redispatch((PersonRequest) request);
+            }
+        });
+        waitingQueue.removeIf(request -> request instanceof PersonRequest);
+        waitingQueue.remove(scheRequest);
     }
 }

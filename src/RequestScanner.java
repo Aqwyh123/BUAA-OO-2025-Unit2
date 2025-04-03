@@ -16,7 +16,7 @@ public class RequestScanner implements Runnable {
         while (true) {
             Request request = elevatorInput.nextRequest();
             if (request == null) {
-                requests.put(new EndRequest());
+                requests.setEnd();
                 break;
             } else {
                 requests.put(request);
