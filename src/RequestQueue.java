@@ -41,7 +41,7 @@ public class RequestQueue implements Iterable<Request> {
     }
 
     public Request take() {
-        if (isEnd) {
+        if (isEmpty() && isEnd) {
             return new EndRequest();
         } else {
             try {
