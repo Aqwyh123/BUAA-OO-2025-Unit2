@@ -15,11 +15,11 @@ public class RequestScanner implements Runnable {
         ElevatorInput elevatorInput = new ElevatorInput(System.in);
         while (true) {
             Request request = elevatorInput.nextRequest();
-            if (request == null) {
+            if (request != null) {
+                requests.put(request);
+            } else {
                 requests.setEnd();
                 break;
-            } else {
-                requests.put(request);
             }
         }
         try {

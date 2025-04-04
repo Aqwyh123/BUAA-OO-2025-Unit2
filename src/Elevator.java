@@ -1,10 +1,12 @@
 import com.oocourse.elevator2.PersonRequest;
+import com.oocourse.elevator2.Request;
 import com.oocourse.elevator2.ScheRequest;
 import com.oocourse.elevator2.TimableOutput;
 
 import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BrokenBarrierException;
@@ -136,26 +138,35 @@ public class Elevator implements Runnable {
     private void executeScheTask(ScheRequest scheRequest) {
         output(String.format("SCHE-BEGIN-%d", id));
         int toPosition = POSITIONS.get(scheRequest.getToFloor());
-        execute(new TurnTask(Integer.signum(toPosition - position)));
+        if (position != toPosition) {
+            execute(new TurnTask(Integer.signum(toPosition - position)));
+        }
         while (position != toPosition) {
             execute(new MoveTask((long) (scheRequest.getSpeed() * 1000)));
         }
         execute(new OpenTask());
-        execute(new OutTask(new ArrayList<>(takingQueue)));
-        takingQueue.forEach(personRequest -> {
+        if (!takingQueue.isEmpty()) {
+            execute(new OutTask(new ArrayList<>(takingQueue)));
+        }
+        Iterator<PersonRequest> takingIterator = takingQueue.iterator();
+        while (takingIterator.hasNext()) {
+            PersonRequest personRequest = takingIterator.next();
             if (position != POSITIONS.get(personRequest.getToFloor())) {
                 redispatch(personRequest);
             }
-        });
-        takingQueue.clear();
-        execute(new CloseTask(MIN_SCHE_STOP_TIME));
-        output(String.format("SCHE-END-%d", id));
-        waitingQueue.forEach(request -> {
+            takingIterator.remove();
+        }
+        Iterator<Request> waitingIterator = waitingQueue.iterator();
+        while (waitingIterator.hasNext()) {
+            Request request = waitingIterator.next();
             if (request instanceof PersonRequest) {
                 redispatch((PersonRequest) request);
+                waitingIterator.remove();
+            } else if (request == scheRequest) {
+                waitingIterator.remove();
             }
-        });
-        waitingQueue.removeIf(request -> request instanceof PersonRequest);
-        waitingQueue.remove(scheRequest);
+        }
+        execute(new CloseTask(MIN_SCHE_STOP_TIME));
+        output(String.format("SCHE-END-%d", id));
     }
 }

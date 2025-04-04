@@ -5,7 +5,6 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.function.Consumer;
-import java.util.function.Predicate;
 
 public class RequestQueue implements Iterable<Request> {
     private final PriorityBlockingQueue<Request> queue;
@@ -58,16 +57,8 @@ public class RequestQueue implements Iterable<Request> {
         return array;
     }
 
-    public void remove(Request request) {
-        queue.remove(request);
-    }
-
     public void removeAll(Collection<? extends Request> c) {
         queue.removeAll(c);
-    }
-
-    public void removeIf(Predicate<? super Request> filter) {
-        queue.removeIf(filter);
     }
 
     @Override

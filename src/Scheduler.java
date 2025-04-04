@@ -10,10 +10,10 @@ public class Scheduler {
         if (state) {
             if (takingQueue.isEmpty() && waitingQueue.isEmpty() && waitingQueue.isEnd()) {
                 return new CloseTask(Elevator.MIN_DOOR_PAUSE_TIME);
-            } else if (waitingQueue.peek() instanceof ScheRequest) {
-                return new CloseTask(Elevator.MIN_DOOR_PAUSE_TIME);
             } else if (hasOut(position, takingQueue)) {
                 return new OutTask(getOut(position, takingQueue));
+            } else if (waitingQueue.peek() instanceof ScheRequest) {
+                return new CloseTask(Elevator.MIN_DOOR_PAUSE_TIME);
             } else if (hasIn(position, direction, waitingQueue, takingQueue)) {
                 return new InTask(getIn(position, direction, takingQueue.size(), waitingQueue));
             } else {
@@ -22,10 +22,10 @@ public class Scheduler {
         } else {
             if (takingQueue.isEmpty() && waitingQueue.isEmpty() && waitingQueue.isEnd()) {
                 return new StopTask();
-            } else if (waitingQueue.peek() instanceof ScheRequest) {
-                return new ScheTask((ScheRequest) waitingQueue.peek());
             } else if (hasOut(position, takingQueue)) {
                 return new OpenTask();
+            } else if (waitingQueue.peek() instanceof ScheRequest) {
+                return new ScheTask((ScheRequest) waitingQueue.peek());
             } else if (direction == 0) {
                 return new TurnTask(getNewDirection(position, waitingQueue));
             } else if (hasIn(position, direction, waitingQueue, takingQueue)) {

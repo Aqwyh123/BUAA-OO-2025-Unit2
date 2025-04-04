@@ -28,8 +28,9 @@ public class Dispatcher implements Runnable {
         while (true) {
             try {
                 boolean shouldContinue = dispatch(dispatchingQueue.take());
-                barrier.reset();
-                if (!shouldContinue) {
+                if (shouldContinue) {
+                    barrier.reset();
+                } else {
                     barrier.await();
                     break;
                 }
@@ -43,13 +44,20 @@ public class Dispatcher implements Runnable {
 
     private boolean dispatch(Request request) {
         if (request instanceof PersonRequest) {
-            PersonRequest personRequest = (PersonRequest) request;
-            int id = (int) waitingQueues.keySet().toArray()[index];
-            locks.get(id).lock();
-            TimableOutput.println(String.format("RECEIVE-%d-%d", personRequest.getPersonId(), id));
-            waitingQueues.get(id).put(personRequest);
-            locks.get(id).unlock();
-            index = (index + 1) % waitingQueues.size();
+            Integer[] ids = locks.keySet().toArray(new Integer[0]);
+            int tryCount = 0;
+            while (!locks.get(ids[index]).tryLock() && tryCount < locks.size()) {
+                index = (index + 1) % locks.size();
+                tryCount++;
+            }
+            if (tryCount == locks.size()) {
+                locks.get(ids[index]).lock();
+            }
+            int personId = ((PersonRequest) request).getPersonId();
+            TimableOutput.println(String.format("RECEIVE-%d-%d", personId, ids[index]));
+            waitingQueues.get(ids[index]).put(request);
+            locks.get(ids[index]).unlock();
+            index = (index + 1) % locks.size();
             return true;
         } else if (request instanceof ScheRequest) {
             ScheRequest scheRequest = (ScheRequest) request;
