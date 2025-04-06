@@ -4,12 +4,11 @@ import java.util.HashMap;
 
 public class MainClass {
     public static final int[] IDS = {1, 2, 3, 4, 5, 6};
-    public static final Monitor monitor = new Monitor();
 
     public static void main(String[] args) {
         TimableOutput.initStartTimestamp();
 
-        Thread monitorThread = new Thread(monitor);
+        Thread monitorThread = new Thread(Monitor.instance);
         monitorThread.start();
 
         RequestQueue scanQueue = new RequestQueue();

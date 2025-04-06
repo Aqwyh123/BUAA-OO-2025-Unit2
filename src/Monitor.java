@@ -3,6 +3,8 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class Monitor implements Runnable {
+    public static final Monitor instance = new Monitor();
+
     private volatile boolean isEnd = false;
     private final ReentrantLock lock = new ReentrantLock();
     private final Condition condition = lock.newCondition();
@@ -17,7 +19,7 @@ public class Monitor implements Runnable {
     private final ConcurrentHashMap<Integer, ReentrantLock> elevatorLocks;
     private final ConcurrentHashMap<Integer, Condition> elevatorCondition;
 
-    public Monitor() {
+    private Monitor() {
         isElevatorEnd = new ConcurrentHashMap<>();
         elevatorLocks = new ConcurrentHashMap<>();
         elevatorCondition = new ConcurrentHashMap<>();

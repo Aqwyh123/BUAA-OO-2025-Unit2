@@ -7,7 +7,7 @@ public class Scheduler {
         RequestQueue dispatchQueue, RequestSet receiveSet, RequestSet takeSet) {
         if (state) {
             if (takeSet.isEmpty() && receiveSet.isEmpty() && dispatchQueue.isEmpty()) {
-                if (MainClass.monitor.isEnd()) {
+                if (Monitor.instance.isEnd()) {
                     return new CloseTask(Elevator.MIN_DOOR_PAUSE_TIME);
                 } else {
                     return new PauseTask();
@@ -25,7 +25,7 @@ public class Scheduler {
             }
         } else {
             if (takeSet.isEmpty() && receiveSet.isEmpty() && dispatchQueue.isEmpty()) {
-                if (MainClass.monitor.isEnd()) {
+                if (Monitor.instance.isEnd()) {
                     return new StopTask();
                 } else {
                     return new PauseTask();

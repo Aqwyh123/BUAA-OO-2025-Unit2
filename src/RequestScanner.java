@@ -16,10 +16,11 @@ public class RequestScanner implements Runnable {
         while (true) {
             Request request = elevatorInput.nextRequest();
             if (request != null) {
+                RequestTimeMap.instance.put(request, System.nanoTime());
                 scanQueue.put(request);
-                MainClass.monitor.signalForDispatch();
+                Monitor.instance.signalForDispatch();
             } else {
-                MainClass.monitor.setScannerEnd(true);
+                Monitor.instance.setScannerEnd(true);
                 break;
             }
         }

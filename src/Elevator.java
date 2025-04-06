@@ -5,7 +5,6 @@ import com.oocourse.elevator2.TimableOutput;
 
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -55,10 +54,10 @@ public class Elevator implements Runnable {
             if (task instanceof StopTask) {
                 break;
             } else if (task instanceof PauseTask) {
-                MainClass.monitor.setElevatorEnd(id, true);
-                MainClass.monitor.waitToExecute(id);
+                Monitor.instance.setElevatorEnd(id, true);
+                Monitor.instance.waitToExecute(id);
             } else {
-                MainClass.monitor.setElevatorEnd(id, false);
+                Monitor.instance.setElevatorEnd(id, false);
                 execute(task);
             }
         }
@@ -110,16 +109,14 @@ public class Elevator implements Runnable {
         } else if (task instanceof TurnTask) {
             direction = ((TurnTask) task).getDirection();
         } else if (task instanceof ReceiveTask) {
-            Iterator<Request> iterator = dispatchQueue.iterator();
-            while (iterator.hasNext()) {
-                Request request = iterator.next();
+            for (Request request : dispatchQueue) {
                 if (request instanceof PersonRequest) {
                     PersonRequest personRequest = (PersonRequest) request;
                     output(String.format("RECEIVE-%d-%d", personRequest.getPersonId(), id));
-                    iterator.remove();
-                    receiveSet.add(request);
+                    receiveSet.add(personRequest);
                 }
             }
+            dispatchQueue.removeAll(receiveSet);
         } else if (task instanceof ScheTask) {
             executeScheTask(((ScheTask) task).getRequest());
         }
@@ -151,7 +148,7 @@ public class Elevator implements Runnable {
             scanQueue.put(new PersonRequest(fromFloor, toFloor, personId, priority));
         }
         receiveSet.clear();
-        MainClass.monitor.signalForDispatch();
+        Monitor.instance.signalForDispatch();
 
         dispatchQueue.remove(scheRequest);
         execute(new CloseTask(MIN_SCHE_STOP_TIME));

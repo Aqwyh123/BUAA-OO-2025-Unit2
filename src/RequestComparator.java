@@ -11,7 +11,7 @@ public class RequestComparator {
 
     private static class PriorityComparator implements Comparator<Request> {
         @Override
-        public int compare(Request o1, Request o2) {  // Higher priority first
+        public int compare(Request o1, Request o2) {  // Higher priority first, lower time first
             int priority1;
             if (o1 instanceof PersonRequest) {
                 priority1 = ((PersonRequest) o1).getPriority();
@@ -28,7 +28,14 @@ public class RequestComparator {
             } else {
                 priority2 = MIN_PRIORITY - 1;
             }
-            return Integer.compare(priority2, priority1);
+            int priorityDiff = Integer.compare(priority2, priority1);
+            if (priorityDiff != 0) {
+                return priorityDiff;
+            } else {
+                long time1 = RequestTimeMap.instance.get(o1);
+                long time2 = RequestTimeMap.instance.get(o2);
+                return Long.compare(time1, time2);
+            }
         }
     }
 }

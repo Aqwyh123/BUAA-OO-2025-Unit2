@@ -17,17 +17,17 @@ public class Dispatcher implements Runnable {
     @Override
     public void run() {
         while (true) {
-            if (scanQueue.isEmpty() && MainClass.monitor.isEnd()) {
+            if (scanQueue.isEmpty() && Monitor.instance.isEnd()) {
                 break;
             } else {
                 Request request = scanQueue.poll();
                 if (request != null) {
-                    MainClass.monitor.setDispatcherEnd(false);
+                    Monitor.instance.setDispatcherEnd(false);
                     int dispatchId = dispatch(request);
-                    MainClass.monitor.signalForExecute(dispatchId);
+                    Monitor.instance.signalForExecute(dispatchId);
                 } else {
-                    MainClass.monitor.setDispatcherEnd(true);
-                    MainClass.monitor.waitToDispatch();
+                    Monitor.instance.setDispatcherEnd(true);
+                    Monitor.instance.waitToDispatch();
                 }
             }
         }
