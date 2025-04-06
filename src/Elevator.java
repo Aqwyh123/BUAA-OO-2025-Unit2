@@ -52,6 +52,7 @@ public class Elevator implements Runnable {
             Task task = Scheduler.getTask(position, direction, doorState,
                 dispatchQueue, receiveSet, takeSet);
             if (task instanceof StopTask) {
+                Monitor.instance.setElevatorEnd(id, true);
                 break;
             } else if (task instanceof PauseTask) {
                 Monitor.instance.setElevatorEnd(id, true);

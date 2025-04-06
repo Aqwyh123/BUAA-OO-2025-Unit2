@@ -1,5 +1,7 @@
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class Monitor implements Runnable {
@@ -33,13 +35,15 @@ public class Monitor implements Runnable {
     @Override
     public void run() {
         while (true) {
-            if (isScannerEnd && isDispatcherEnd &&
-                isElevatorEnd.values().stream().allMatch(e -> e)) {
+            if (canSetEnd()) {
                 isEnd = true;
-                signalForDispatch();
-                for (int id : MainClass.IDS) {
-                    signalForExecute(id);
-                }
+                do {
+                    signalForDispatch();
+                    for (int id : MainClass.IDS) {
+                        signalForExecute(id);
+                    }
+                    LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(100));
+                } while (!canSetEnd());
                 break;
             } else {
                 waitToEnd();
@@ -49,6 +53,10 @@ public class Monitor implements Runnable {
 
     public boolean isEnd() {
         return isEnd;
+    }
+
+    private boolean canSetEnd() {
+        return isScannerEnd && isDispatcherEnd && isElevatorEnd.values().stream().allMatch(e -> e);
     }
 
     public void setScannerEnd(boolean isEnd) {

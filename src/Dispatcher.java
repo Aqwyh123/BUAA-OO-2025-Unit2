@@ -18,6 +18,7 @@ public class Dispatcher implements Runnable {
     public void run() {
         while (true) {
             if (scanQueue.isEmpty() && Monitor.instance.isEnd()) {
+                Monitor.instance.setDispatcherEnd(true);
                 break;
             } else {
                 Request request = scanQueue.poll();
