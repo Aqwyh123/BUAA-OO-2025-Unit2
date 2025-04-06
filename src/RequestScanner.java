@@ -4,10 +4,10 @@ import com.oocourse.elevator2.Request;
 import java.io.IOException;
 
 public class RequestScanner implements Runnable {
-    private final RequestQueue requests;
+    private final RequestQueue scanQueue;
 
-    public RequestScanner(RequestQueue requests) {
-        this.requests = requests;
+    public RequestScanner(RequestQueue scanQueue) {
+        this.scanQueue = scanQueue;
     }
 
     @Override
@@ -16,9 +16,10 @@ public class RequestScanner implements Runnable {
         while (true) {
             Request request = elevatorInput.nextRequest();
             if (request != null) {
-                requests.put(request);
+                scanQueue.put(request);
+                MainClass.monitor.signalForDispatch();
             } else {
-                requests.setEnd();
+                MainClass.monitor.setScannerEnd(true);
                 break;
             }
         }

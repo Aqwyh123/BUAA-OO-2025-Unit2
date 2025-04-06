@@ -1,34 +1,30 @@
 import com.oocourse.elevator2.TimableOutput;
 
 import java.util.HashMap;
-import java.util.concurrent.CyclicBarrier;
-import java.util.concurrent.locks.ReentrantLock;
 
 public class MainClass {
+    public static final int[] IDS = {1, 2, 3, 4, 5, 6};
+    public static final Monitor monitor = new Monitor();
+
     public static void main(String[] args) {
         TimableOutput.initStartTimestamp();
 
-        RequestQueue dispatchingQueue = new RequestQueue();
-        Thread scannerThread = new Thread(new RequestScanner(dispatchingQueue));
-        scannerThread.setPriority(Thread.MAX_PRIORITY);
+        Thread monitorThread = new Thread(monitor);
+        monitorThread.start();
+
+        RequestQueue scanQueue = new RequestQueue();
+        Thread scannerThread = new Thread(new RequestScanner(scanQueue));
         scannerThread.start();
 
-        HashMap<Integer, ReentrantLock> locks = new HashMap<>();
-        CyclicBarrier barrier = new CyclicBarrier(Elevator.IDS.length + 1);
-
-        HashMap<Integer, RequestQueue> waitingQueues = new HashMap<>();
-        for (int id : Elevator.IDS) {
-            locks.put(id, new ReentrantLock());
-            waitingQueues.put(id, new RequestQueue());
+        HashMap<Integer, RequestQueue> dispatchQueues = new HashMap<>();
+        for (int id : IDS) {
+            dispatchQueues.put(id, new RequestQueue());
         }
-        Thread dispatcherThread = new Thread(new Dispatcher(locks, barrier,
-            dispatchingQueue, waitingQueues));
-        dispatcherThread.setPriority(Thread.MAX_PRIORITY - 1);
+        Thread dispatcherThread = new Thread(new Dispatcher(scanQueue, dispatchQueues));
         dispatcherThread.start();
 
-        for (int id : Elevator.IDS) {
-            Thread elevatorThread = new Thread(new Elevator(id, locks.get(id), barrier,
-                dispatchingQueue, waitingQueues.get(id)));
+        for (int id : IDS) {
+            Thread elevatorThread = new Thread(new Elevator(id, scanQueue, dispatchQueues.get(id)));
             elevatorThread.start();
         }
     }

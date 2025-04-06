@@ -1,73 +1,37 @@
 import com.oocourse.elevator2.Request;
 
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.Iterator;
 import java.util.concurrent.PriorityBlockingQueue;
-import java.util.function.Consumer;
 
 public class RequestQueue implements Iterable<Request> {
     private final PriorityBlockingQueue<Request> queue;
-    private boolean isEnd;
 
     public RequestQueue() {
         this.queue = new PriorityBlockingQueue<>(100, RequestComparator.priorityComparator);
-        this.isEnd = false;
     }
 
     public boolean isEmpty() {
         return queue.isEmpty();
     }
 
-    public boolean isEnd() {
-        return isEnd;
-    }
-
-    public void setEnd() {
-        this.isEnd = true;
-    }
-
     public Request peek() {
-        if (isEmpty() && isEnd) {
-            return new EndRequest();
-        } else {
-            return queue.peek();
-        }
+        return queue.peek();
     }
 
     public void put(Request request) {
         queue.put(request);
     }
 
-    public Request take() {
-        if (isEmpty() && isEnd) {
-            return new EndRequest();
-        } else {
-            try {
-                return queue.take();
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-        }
+    public Request poll() {
+        return queue.poll();
     }
 
-    public Request[] toArray() {
-        Request[] array = queue.toArray(new Request[0]);
-        Arrays.sort(array, RequestComparator.priorityComparator);
-        return array;
-    }
-
-    public void removeAll(Collection<? extends Request> c) {
-        queue.removeAll(c);
+    public boolean remove(Request request) {
+        return queue.remove(request);
     }
 
     @Override
     public Iterator<Request> iterator() {
         return queue.iterator();
-    }
-
-    @Override
-    public void forEach(Consumer<? super Request> consumer) {
-        queue.forEach(consumer);
     }
 }

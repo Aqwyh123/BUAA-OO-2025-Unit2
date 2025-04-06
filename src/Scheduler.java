@@ -2,38 +2,48 @@ import com.oocourse.elevator2.PersonRequest;
 import com.oocourse.elevator2.Request;
 import com.oocourse.elevator2.ScheRequest;
 
-import java.util.ArrayList;
-
 public class Scheduler {
     public static Task getTask(int position, int direction, boolean state,
-        RequestQueue waitingQueue, ProcessingQueue takingQueue) {
+        RequestQueue dispatchQueue, RequestSet receiveSet, RequestSet takeSet) {
         if (state) {
-            if (takingQueue.isEmpty() && waitingQueue.isEmpty() && waitingQueue.isEnd()) {
+            if (takeSet.isEmpty() && receiveSet.isEmpty() && dispatchQueue.isEmpty()) {
+                if (MainClass.monitor.isEnd()) {
+                    return new CloseTask(Elevator.MIN_DOOR_PAUSE_TIME);
+                } else {
+                    return new PauseTask();
+                }
+            } else if (hasOut(position, takeSet)) {
+                return new OutTask(getOut(position, takeSet));
+            } else if (dispatchQueue.peek() instanceof ScheRequest) {
                 return new CloseTask(Elevator.MIN_DOOR_PAUSE_TIME);
-            } else if (hasOut(position, takingQueue)) {
-                return new OutTask(getOut(position, takingQueue));
-            } else if (waitingQueue.peek() instanceof ScheRequest) {
-                return new CloseTask(Elevator.MIN_DOOR_PAUSE_TIME);
-            } else if (hasIn(position, direction, waitingQueue, takingQueue)) {
-                return new InTask(getIn(position, direction, takingQueue.size(), waitingQueue));
+            } else if (!dispatchQueue.isEmpty()) {
+                return new ReceiveTask();
+            } else if (hasIn(position, direction, receiveSet, takeSet)) {
+                return new InTask(getIn(position, direction, takeSet.size(), receiveSet));
             } else {
                 return new CloseTask(Elevator.MIN_DOOR_PAUSE_TIME);
             }
         } else {
-            if (takingQueue.isEmpty() && waitingQueue.isEmpty() && waitingQueue.isEnd()) {
-                return new StopTask();
-            } else if (hasOut(position, takingQueue)) {
+            if (takeSet.isEmpty() && receiveSet.isEmpty() && dispatchQueue.isEmpty()) {
+                if (MainClass.monitor.isEnd()) {
+                    return new StopTask();
+                } else {
+                    return new PauseTask();
+                }
+            } else if (hasOut(position, takeSet)) {
                 return new OpenTask();
-            } else if (waitingQueue.peek() instanceof ScheRequest) {
-                return new ScheTask((ScheRequest) waitingQueue.peek());
+            } else if (dispatchQueue.peek() instanceof ScheRequest) {
+                return new ScheTask((ScheRequest) dispatchQueue.peek());
+            } else if (!dispatchQueue.isEmpty()) {
+                return new ReceiveTask();
             } else if (direction == 0) {
-                return new TurnTask(getNewDirection(position, waitingQueue));
-            } else if (hasIn(position, direction, waitingQueue, takingQueue)) {
+                return new TurnTask(getNewDirection(position, receiveSet));
+            } else if (hasIn(position, direction, receiveSet, takeSet)) {
                 return new OpenTask();
-            } else if (!takingQueue.isEmpty()) {
+            } else if (!takeSet.isEmpty()) {
                 return new MoveTask(Elevator.RATED_SPEED);
             } else {
-                int newDirection = getNewDirection(position, waitingQueue);
+                int newDirection = getNewDirection(position, receiveSet);
                 if (newDirection == direction) {
                     return new MoveTask(Elevator.RATED_SPEED);
                 } else {
@@ -43,28 +53,12 @@ public class Scheduler {
         }
     }
 
-    private static int getNewDirection(int position, RequestQueue waitingQueue) {
-        Request request = waitingQueue.peek();
-        if (request instanceof PersonRequest) {
-            PersonRequest personRequest = (PersonRequest) request;
-            int fromPosition = Elevator.POSITIONS.get(personRequest.getFromFloor());
-            int toPosition = Elevator.POSITIONS.get(personRequest.getToFloor());
-            if (fromPosition == position) {
-                return Integer.signum(toPosition - position);
-            } else {
-                return Integer.signum(fromPosition - position);
-            }
-        } else {
-            return 0;
-        }
-    }
-
     private static boolean hasIn(int position, int direction,
-        RequestQueue waitingQueue, ProcessingQueue takingQueue) {
-        if (takingQueue.size() >= Elevator.RATED_LOAD) {
+        RequestSet receiveSet, RequestSet takeSet) {
+        if (takeSet.size() >= Elevator.RATED_LOAD) {
             return false;
         }
-        for (Request request : waitingQueue) {
+        for (Request request : receiveSet) {
             if (request instanceof PersonRequest) {
                 PersonRequest personRequest = (PersonRequest) request;
                 int fromPosition = Elevator.POSITIONS.get(personRequest.getFromFloor());
@@ -77,9 +71,9 @@ public class Scheduler {
         return false;
     }
 
-    private static boolean hasOut(int position, ProcessingQueue takingQueue) {
-        for (PersonRequest request : takingQueue) {
-            int toPosition = Elevator.POSITIONS.get(request.getToFloor());
+    private static boolean hasOut(int position, RequestSet takeSet) {
+        for (Request request : takeSet) {
+            int toPosition = Elevator.POSITIONS.get(((PersonRequest) request).getToFloor());
             if (toPosition == position) {
                 return true;
             }
@@ -87,36 +81,39 @@ public class Scheduler {
         return false;
     }
 
-    private static ArrayList<PersonRequest> getIn(int position, int direction, int size,
-        RequestQueue waitingQueue) {
-        ArrayList<PersonRequest> inQueue = new ArrayList<>();
-        Request[] waitingList = waitingQueue.toArray();
-        for (Request request : waitingList) {
-            if (size + inQueue.size() >= Elevator.RATED_LOAD) {
-                break;
-            }
-            if (request instanceof PersonRequest) {
-                PersonRequest personRequest = (PersonRequest) request;
-                int fromPosition = Elevator.POSITIONS.get(personRequest.getFromFloor());
-                int toPosition = Elevator.POSITIONS.get(personRequest.getToFloor());
-                if (fromPosition == position && direction * (toPosition - position) > 0) {
-                    inQueue.add(personRequest);
-                }
-            }
+    private static int getNewDirection(int position, RequestSet receiveSet) {
+        PersonRequest request = (PersonRequest) receiveSet.first();
+        int fromPosition = Elevator.POSITIONS.get(request.getFromFloor());
+        int toPosition = Elevator.POSITIONS.get(request.getToFloor());
+        if (position != fromPosition) {
+            return Integer.signum(fromPosition - position);
+        } else {
+            return Integer.signum(toPosition - position);
         }
-        return inQueue;
     }
 
-    private static ArrayList<PersonRequest> getOut(int position, ProcessingQueue takingQueue) {
-        ArrayList<PersonRequest> outQueue = new ArrayList<>();
-        Request[] takingList = takingQueue.toArray();
-        for (Request request : takingList) {
-            if (request instanceof PersonRequest) {
-                PersonRequest personRequest = (PersonRequest) request;
-                int toPosition = Elevator.POSITIONS.get(personRequest.getToFloor());
-                if (toPosition == position) {
-                    outQueue.add(personRequest);
-                }
+    private static RequestSet getIn(int position, int direction, int size, RequestSet receiveSet) {
+        RequestSet inSet = new RequestSet();
+        for (Request request : receiveSet) {
+            if (size + inSet.size() >= Elevator.RATED_LOAD) {
+                break;
+            }
+            PersonRequest personRequest = (PersonRequest) request;
+            int fromPosition = Elevator.POSITIONS.get(personRequest.getFromFloor());
+            int toPosition = Elevator.POSITIONS.get(personRequest.getToFloor());
+            if (fromPosition == position && direction * (toPosition - position) > 0) {
+                inSet.add(personRequest);
+            }
+        }
+        return inSet;
+    }
+
+    private static RequestSet getOut(int position, RequestSet takeSet) {
+        RequestSet outQueue = new RequestSet();
+        for (Request request : takeSet) {
+            int toPosition = Elevator.POSITIONS.get(((PersonRequest) request).getToFloor());
+            if (toPosition == position) {
+                outQueue.add(request);
             }
         }
         return outQueue;

@@ -1,15 +1,11 @@
-import com.oocourse.elevator2.PersonRequest;
-
-import java.util.ArrayList;
-
 public class OutTask implements Task {
-    private final ArrayList<PersonRequest> outQueue;
+    private final RequestSet outSet;
 
-    public OutTask(ArrayList<PersonRequest> outQueue) {
-        this.outQueue = outQueue;
+    public OutTask(RequestSet outSet) {
+        this.outSet = outSet;
     }
 
-    public ArrayList<PersonRequest> getOut() {
-        return outQueue;
+    public RequestSet getOut() {
+        return outSet;
     }
 }

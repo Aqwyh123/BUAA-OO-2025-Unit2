@@ -1,15 +1,11 @@
-import com.oocourse.elevator2.PersonRequest;
-
-import java.util.ArrayList;
-
 public class InTask implements Task {
-    private final ArrayList<PersonRequest> inQueue;
+    private final RequestSet inSet;
 
-    public InTask(ArrayList<PersonRequest> inQueue) {
-        this.inQueue = inQueue;
+    public InTask(RequestSet inSet) {
+        this.inSet = inSet;
     }
 
-    public ArrayList<PersonRequest> getIn() {
-        return inQueue;
+    public RequestSet getIn() {
+        return inSet;
     }
 }
