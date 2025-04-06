@@ -42,7 +42,7 @@ public class Monitor implements Runnable {
                     for (int id : MainClass.IDS) {
                         signalForExecute(id);
                     }
-                    LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(100));
+                    LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(400));
                 } while (!canSetEnd());
                 break;
             } else {
