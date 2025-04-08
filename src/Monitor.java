@@ -1,100 +1,78 @@
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class Monitor implements Runnable {
     public static final Monitor instance = new Monitor();
 
-    private volatile boolean isEnd = false;
     private final ReentrantLock lock = new ReentrantLock();
     private final Condition condition = lock.newCondition();
+    private final AtomicBoolean isScannerEnd = new AtomicBoolean(false);
+    private final AtomicInteger requestCount = new AtomicInteger(0);
 
-    private volatile boolean isScannerEnd = false;
-
-    private volatile boolean isDispatcherEnd = false;
     private final ReentrantLock dispatchLock = new ReentrantLock();
     private final Condition dispatchCondition = dispatchLock.newCondition();
 
-    private final ConcurrentHashMap<Integer, Boolean> isElevatorEnd;
     private final ConcurrentHashMap<Integer, ReentrantLock> elevatorLocks;
-    private final ConcurrentHashMap<Integer, Condition> elevatorCondition;
+    private final ConcurrentHashMap<Integer, Condition> elevatorConditions;
 
     private Monitor() {
-        isElevatorEnd = new ConcurrentHashMap<>();
         elevatorLocks = new ConcurrentHashMap<>();
-        elevatorCondition = new ConcurrentHashMap<>();
+        elevatorConditions = new ConcurrentHashMap<>();
         for (int id : MainClass.IDS) {
-            isElevatorEnd.put(id, false);
             elevatorLocks.put(id, new ReentrantLock());
-            elevatorCondition.put(id, elevatorLocks.get(id).newCondition());
+            elevatorConditions.put(id, elevatorLocks.get(id).newCondition());
         }
     }
 
     @Override
     public void run() {
         while (true) {
-            if (canSetEnd()) {
-                isEnd = true;
-                do {
-                    signalForDispatch();
-                    for (int id : MainClass.IDS) {
-                        signalForExecute(id);
-                    }
-                    LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(400));
-                } while (!canSetEnd());
+            if (!tryWaitToMonitor()) {
+                signalForDispatch();
+                for (int id : MainClass.IDS) {
+                    signalForExecute(id);
+                }
                 break;
-            } else {
-                waitToEnd();
             }
         }
     }
 
-    public boolean isEnd() {
-        return isEnd;
+    public void setScannerEnd() {
+        isScannerEnd.set(true);
+        signalForMonitor();
     }
 
-    private boolean canSetEnd() {
-        return isScannerEnd && isDispatcherEnd && isElevatorEnd.values().stream().allMatch(e -> e);
-    }
-
-    public void setScannerEnd(boolean isEnd) {
-        boolean before = isScannerEnd;
-        isScannerEnd = isEnd;
-        if (!before && isEnd) {
-            signalForEnd();
+    public void increaseRequestCount() {
+        if (requestCount.incrementAndGet() == 0) {
+            signalForMonitor();
         }
     }
 
-    public void setDispatcherEnd(boolean isEnd) {
-        boolean before = isDispatcherEnd;
-        isDispatcherEnd = isEnd;
-        if (!before && isEnd) {
-            signalForEnd();
+    public void decreaseRequestCount() {
+        if (requestCount.decrementAndGet() == 0) {
+            signalForMonitor();
         }
     }
 
-    public void setElevatorEnd(int id, boolean isEnd) {
-        boolean before = isElevatorEnd.get(id);
-        isElevatorEnd.put(id, isEnd);
-        if (!before && isEnd) {
-            signalForEnd();
-        }
-    }
-
-    private void waitToEnd() {
+    private boolean tryWaitToMonitor() {
         lock.lock();
+        boolean isContinue = !(isScannerEnd.get() && requestCount.get() == 0);
         try {
-            condition.await();
+            if (isContinue) {
+                condition.await();
+            }
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         } finally {
             lock.unlock();
         }
+        return isContinue;
     }
 
-    private void signalForEnd() {
+    private void signalForMonitor() {
         lock.lock();
         try {
             condition.signalAll();
@@ -103,15 +81,19 @@ public class Monitor implements Runnable {
         }
     }
 
-    public void waitToDispatch() {
+    public boolean tryWaitToDispatch() {
         dispatchLock.lock();
+        boolean isContinue = !(isScannerEnd.get() && requestCount.get() == 0);
         try {
-            dispatchCondition.await();
+            if (isContinue) {
+                dispatchCondition.await();
+            }
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         } finally {
             dispatchLock.unlock();
         }
+        return isContinue;
     }
 
     public void signalForDispatch() {
@@ -123,25 +105,27 @@ public class Monitor implements Runnable {
         }
     }
 
-    public void waitToExecute(int id) {
+    public boolean tryWaitToExecute(int id) {
         ReentrantLock elevatorLock = elevatorLocks.get(id);
-        Condition elevatorCondition = this.elevatorCondition.get(id);
         elevatorLock.lock();
+        boolean isContinue = !(isScannerEnd.get() && requestCount.get() == 0);
         try {
-            elevatorCondition.await();
+            if (isContinue) {
+                elevatorConditions.get(id).await();
+            }
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         } finally {
             elevatorLock.unlock();
         }
+        return isContinue;
     }
 
     public void signalForExecute(int id) {
         ReentrantLock elevatorLock = elevatorLocks.get(id);
-        Condition elevatorCondition = this.elevatorCondition.get(id);
         elevatorLock.lock();
         try {
-            elevatorCondition.signalAll();
+            elevatorConditions.get(id).signalAll();
         } finally {
             elevatorLock.unlock();
         }

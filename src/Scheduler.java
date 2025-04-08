@@ -7,11 +7,7 @@ public class Scheduler {
         RequestQueue dispatchQueue, RequestSet receiveSet, RequestSet takeSet) {
         if (state) {
             if (takeSet.isEmpty() && receiveSet.isEmpty() && dispatchQueue.isEmpty()) {
-                if (Monitor.instance.isEnd()) {
-                    return new CloseTask(Elevator.MIN_DOOR_PAUSE_TIME);
-                } else {
-                    return new PauseTask();
-                }
+                return new PauseTask();
             } else if (hasOut(position, takeSet)) {
                 return new OutTask(getOut(position, takeSet));
             } else if (dispatchQueue.peek() instanceof ScheRequest) {
@@ -25,11 +21,7 @@ public class Scheduler {
             }
         } else {
             if (takeSet.isEmpty() && receiveSet.isEmpty() && dispatchQueue.isEmpty()) {
-                if (Monitor.instance.isEnd()) {
-                    return new StopTask();
-                } else {
-                    return new PauseTask();
-                }
+                return new PauseTask();
             } else if (hasOut(position, takeSet)) {
                 return new OpenTask();
             } else if (dispatchQueue.peek() instanceof ScheRequest) {

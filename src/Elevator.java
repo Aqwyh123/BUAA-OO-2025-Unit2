@@ -51,14 +51,14 @@ public class Elevator implements Runnable {
         while (true) {
             Task task = Scheduler.getTask(position, direction, doorState,
                 dispatchQueue, receiveSet, takeSet);
-            if (task instanceof StopTask) {
-                Monitor.instance.setElevatorEnd(id, true);
-                break;
-            } else if (task instanceof PauseTask) {
-                Monitor.instance.setElevatorEnd(id, true);
-                Monitor.instance.waitToExecute(id);
+            if (task instanceof PauseTask) {
+                if (!Monitor.instance.tryWaitToExecute(id)) {
+                    if (doorState) {
+                        execute(new CloseTask(MIN_DOOR_PAUSE_TIME));
+                    }
+                    break;
+                }
             } else {
-                Monitor.instance.setElevatorEnd(id, false);
                 execute(task);
             }
         }
@@ -98,8 +98,15 @@ public class Elevator implements Runnable {
                 int personId = ((PersonRequest) request).getPersonId();
                 if (position == POSITIONS.get(((PersonRequest) request).getToFloor())) {
                     output(String.format("OUT-S-%d-%s-%d", personId, FLOORS.get(position), id));
+                    Monitor.instance.decreaseRequestCount();
                 } else {
                     output(String.format("OUT-F-%d-%s-%d", personId, FLOORS.get(position), id));
+                    int priority = ((PersonRequest) request).getPriority();
+                    String fromFloor = Elevator.FLOORS.get(position);
+                    String toFloor = ((PersonRequest) request).getToFloor();
+                    Request newReq = new PersonRequest(fromFloor, toFloor, personId, priority);
+                    RequestComparator.timeMap.put(newReq, RequestComparator.timeMap.get(request));
+                    receiveSet.add(newReq);
                 }
             }
             outSet.forEach(takeSet::remove);
@@ -119,11 +126,12 @@ public class Elevator implements Runnable {
             }
             dispatchQueue.removeAll(receiveSet);
         } else if (task instanceof ScheTask) {
-            executeScheTask(((ScheTask) task).getRequest());
+            executeScheTask((ScheTask) task);
         }
     }
 
-    private void executeScheTask(ScheRequest scheRequest) {
+    private void executeScheTask(ScheTask scheTask) {
+        ScheRequest scheRequest = scheTask.getRequest();
         output(String.format("SCHE-BEGIN-%d", id));
         int toPosition = POSITIONS.get(scheRequest.getToFloor());
         execute(new TurnTask(Integer.signum(toPosition - position)));
@@ -131,27 +139,12 @@ public class Elevator implements Runnable {
             execute(new MoveTask((long) (scheRequest.getSpeed() * 1000)));
         }
         execute(new OpenTask());
-
-        RequestSet redispatchSet = new RequestSet();
-        for (Request request : takeSet) {
-            if (position != POSITIONS.get(((PersonRequest) request).getToFloor())) {
-                redispatchSet.add(request);
-            }
-        }
-        redispatchSet.addAll(receiveSet);
         execute(new OutTask((RequestSet) takeSet.clone()));
-        for (Request request : redispatchSet) {
-            PersonRequest personRequest = (PersonRequest) request;
-            String fromFloor = personRequest.getFromFloor();
-            String toFloor = personRequest.getToFloor();
-            int personId = personRequest.getPersonId();
-            int priority = personRequest.getPriority();
-            scanQueue.put(new PersonRequest(fromFloor, toFloor, personId, priority));
-        }
+        scanQueue.addAll(receiveSet);
         receiveSet.clear();
-        Monitor.instance.signalForDispatch();
-
         dispatchQueue.remove(scheRequest);
+        Monitor.instance.decreaseRequestCount();
+        Monitor.instance.signalForDispatch();
         execute(new CloseTask(MIN_SCHE_STOP_TIME));
         output(String.format("SCHE-END-%d", id));
     }

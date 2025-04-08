@@ -3,11 +3,16 @@ import com.oocourse.elevator2.ScheRequest;
 import com.oocourse.elevator2.Request;
 
 import java.util.Comparator;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class RequestComparator {
     private static final int MAX_PRIORITY = 100;
     private static final int MIN_PRIORITY = 1;
     public static final Comparator<Request> priorityComparator = new PriorityComparator();
+    public static final ConcurrentHashMap<Request, Long> timeMap = new ConcurrentHashMap<>();
+
+    private RequestComparator() {
+    }
 
     private static class PriorityComparator implements Comparator<Request> {
         @Override
@@ -32,9 +37,12 @@ public class RequestComparator {
             if (priorityDiff != 0) {
                 return priorityDiff;
             } else {
-                long time1 = RequestTimeMap.instance.get(o1);
-                long time2 = RequestTimeMap.instance.get(o2);
-                return Long.compare(time1, time2);
+                int timeDiff = Long.compare(timeMap.get(o1), timeMap.get(o2));
+                if (timeDiff != 0) {
+                    return timeDiff;
+                } else {
+                    return o1.toString().compareTo(o2.toString());
+                }
             }
         }
     }

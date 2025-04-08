@@ -16,11 +16,12 @@ public class RequestScanner implements Runnable {
         while (true) {
             Request request = elevatorInput.nextRequest();
             if (request != null) {
-                RequestTimeMap.instance.put(request, System.nanoTime());
+                RequestComparator.timeMap.put(request, System.nanoTime());
                 scanQueue.put(request);
+                Monitor.instance.increaseRequestCount();
                 Monitor.instance.signalForDispatch();
             } else {
-                Monitor.instance.setScannerEnd(true);
+                Monitor.instance.setScannerEnd();
                 break;
             }
         }
@@ -31,3 +32,4 @@ public class RequestScanner implements Runnable {
         }
     }
 }
+
