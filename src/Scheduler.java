@@ -1,15 +1,25 @@
 import com.oocourse.elevator3.PersonRequest;
 import com.oocourse.elevator3.Request;
 import com.oocourse.elevator3.ScheRequest;
+import com.oocourse.elevator3.UpdateRequest;
+
+import java.util.HashSet;
 
 public class Scheduler {
-    public static Task getTask(int position, int direction, boolean state,
+    public static Task getTask(HashSet<Integer> positions, int transferPosition,
+        int position, int direction, boolean state,
         RequestQueue dispatchQueue, RequestSet receiveSet, RequestSet takeSet) {
         if (state) {
             if (takeSet.isEmpty() && receiveSet.isEmpty() && dispatchQueue.isEmpty()) {
                 return new PauseTask();
-            } else if (hasOut(position, takeSet)) {
-                return new OutTask(getOut(position, takeSet));
+            } else if (dispatchQueue.peek() instanceof UpdateRequest) {
+                if (takeSet.isEmpty()) {
+                    return new CloseTask(Elevator.MIN_DOOR_PAUSE_TIME);
+                } else {
+                    return new OutTask((RequestSet) takeSet.clone());
+                }
+            } else if (hasOut(positions, transferPosition, position, takeSet)) {
+                return new OutTask(getOut(positions, transferPosition, position, takeSet));
             } else if (dispatchQueue.peek() instanceof ScheRequest) {
                 return new CloseTask(Elevator.MIN_DOOR_PAUSE_TIME);
             } else if (!dispatchQueue.isEmpty()) {
@@ -22,7 +32,13 @@ public class Scheduler {
         } else {
             if (takeSet.isEmpty() && receiveSet.isEmpty() && dispatchQueue.isEmpty()) {
                 return new PauseTask();
-            } else if (hasOut(position, takeSet)) {
+            } else if (dispatchQueue.peek() instanceof UpdateRequest) {
+                if (takeSet.isEmpty()) {
+                    return new UpdateTask((UpdateRequest) dispatchQueue.peek());
+                } else {
+                    return new OpenTask();
+                }
+            } else if (hasOut(positions, transferPosition, position, takeSet)) {
                 return new OpenTask();
             } else if (dispatchQueue.peek() instanceof ScheRequest) {
                 return new ScheTask((ScheRequest) dispatchQueue.peek());
@@ -33,11 +49,11 @@ public class Scheduler {
             } else if (hasIn(position, direction, receiveSet, takeSet)) {
                 return new OpenTask();
             } else if (!takeSet.isEmpty()) {
-                return new MoveTask(Elevator.RATED_SPEED);
+                return new MoveTask();
             } else {
                 int newDirection = getNewDirection(position, receiveSet);
                 if (newDirection == direction) {
-                    return new MoveTask(Elevator.RATED_SPEED);
+                    return new MoveTask();
                 } else {
                     return new TurnTask(newDirection);
                 }
@@ -63,10 +79,12 @@ public class Scheduler {
         return false;
     }
 
-    private static boolean hasOut(int position, RequestSet takeSet) {
+    private static boolean hasOut(HashSet<Integer> positions, int transferPosition,
+        int position, RequestSet takeSet) {
         for (Request request : takeSet) {
             int toPosition = Elevator.POSITIONS.get(((PersonRequest) request).getToFloor());
-            if (toPosition == position) {
+            if (toPosition == position ||
+                !positions.contains(toPosition) && position == transferPosition) {
                 return true;
             }
         }
@@ -100,11 +118,13 @@ public class Scheduler {
         return inSet;
     }
 
-    private static RequestSet getOut(int position, RequestSet takeSet) {
+    private static RequestSet getOut(HashSet<Integer> positions, int transferPosition,
+        int position, RequestSet takeSet) {
         RequestSet outQueue = new RequestSet();
         for (Request request : takeSet) {
             int toPosition = Elevator.POSITIONS.get(((PersonRequest) request).getToFloor());
-            if (toPosition == position) {
+            if (toPosition == position ||
+                !positions.contains(toPosition) && position == transferPosition) {
                 outQueue.add(request);
             }
         }

@@ -21,7 +21,7 @@ public class Monitor implements Runnable {
     private Monitor() {
         elevatorLocks = new ConcurrentHashMap<>();
         elevatorConditions = new ConcurrentHashMap<>();
-        for (int id : MainClass.IDS) {
+        for (int id : Elevator.IDS) {
             elevatorLocks.put(id, new ReentrantLock());
             elevatorConditions.put(id, elevatorLocks.get(id).newCondition());
         }
@@ -30,9 +30,9 @@ public class Monitor implements Runnable {
     @Override
     public void run() {
         while (true) {
-            if (!tryWaitToMonitor()) {
+            if (!tryAwaitToMonitor()) {
                 signalForDispatch();
-                for (int id : MainClass.IDS) {
+                for (int id : elevatorLocks.keySet()) {
                     signalForExecute(id);
                 }
                 break;
@@ -57,7 +57,7 @@ public class Monitor implements Runnable {
         }
     }
 
-    private boolean tryWaitToMonitor() {
+    private boolean tryAwaitToMonitor() {
         lock.lock();
         boolean isContinue = !(isScannerEnd.get() && requestCount.get() == 0);
         try {
@@ -81,7 +81,7 @@ public class Monitor implements Runnable {
         }
     }
 
-    public boolean tryWaitToDispatch() {
+    public boolean tryAwaitToDispatch() {
         dispatchLock.lock();
         boolean isContinue = !(isScannerEnd.get() && requestCount.get() == 0);
         try {
@@ -105,7 +105,7 @@ public class Monitor implements Runnable {
         }
     }
 
-    public boolean tryWaitToExecute(int id) {
+    public boolean tryAwaitToExecute(int id) {
         ReentrantLock elevatorLock = elevatorLocks.get(id);
         elevatorLock.lock();
         boolean isContinue = !(isScannerEnd.get() && requestCount.get() == 0);
