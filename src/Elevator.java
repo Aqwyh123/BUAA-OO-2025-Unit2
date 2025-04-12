@@ -150,6 +150,7 @@ public class Elevator implements Runnable {
     }
 
     private void executeReceiveTask() {
+        RequestSet finishSet = new RequestSet();
         for (Request request : dispatchQueues.get(id)) {
             if (request instanceof PersonRequest) {
                 printf("RECEIVE-%d-%d", ((PersonRequest) request).getPersonId(), id);
@@ -165,10 +166,11 @@ public class Elevator implements Runnable {
                     }
                     execute(new MoveTask());
                 }
-                dispatchQueues.get(id).remove(request);
+                finishSet.add(request);
             }
         }
         dispatchQueues.get(id).removeAll(receiveSet);
+        dispatchQueues.get(id).removeAll(finishSet);
     }
 
     private void executeMoveTask() {
@@ -179,7 +181,12 @@ public class Elevator implements Runnable {
             RequestComparator.timeMap.put(transferRequest, System.nanoTime());
             dispatchQueues.get(twinsId).put(transferRequest);
             Monitor.instance.signalForExecute(twinsId);
+            long lockTime = System.currentTimeMillis();
             transferLocks.get(shaftId).lock();
+            long pauseTime = speed - (System.currentTimeMillis() - lockTime);
+            if (pauseTime > 0) {
+                delay(pauseTime);
+            }
         }
         position = position + direction;
         printf("ARRIVE-%s-%d", FLOORS.get(position), id);
@@ -234,16 +241,24 @@ public class Elevator implements Runnable {
             positions.removeIf(position -> position > transferPosition);
             position = transferPosition - 1;
         }
+        RequestSet invalidSet = dispatchQueues.get(id).stream().filter(request -> {
+            if (request instanceof PersonRequest) {
+                return !positions.contains(POSITIONS.get(((PersonRequest) request).getToFloor()));
+            }
+            return false;
+        }).collect(Collectors.toCollection(RequestSet::new));
         scanQueue.addAll(receiveSet);
         receiveSet.clear();
+        scanQueue.addAll(invalidSet);
+        dispatchQueues.get(id).removeAll(invalidSet);
         dispatchQueues.get(id).remove(updateRequest);
         Monitor.instance.signalForDispatch();
         if (id == shaftId) {
+            Monitor.instance.decreaseRequestCount();
             long pauseTime = MIN_UPDATE_TIME - (System.currentTimeMillis() - beginTime);
             if (pauseTime > 0) {
                 delay(pauseTime);
             }
-            Monitor.instance.decreaseRequestCount();
             printf("UPDATE-END-%d-%d", elevatorId, shaftId);
         }
         try {
