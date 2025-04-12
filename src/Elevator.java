@@ -160,6 +160,9 @@ public class Elevator implements Runnable {
                     if (toDirection != direction) {
                         execute(new TurnTask(toDirection));
                     }
+                    if (doorState) {
+                        execute(new CloseTask(MIN_DOOR_PAUSE_TIME));
+                    }
                     execute(new MoveTask());
                 }
                 dispatchQueues.get(id).remove(request);
@@ -213,6 +216,10 @@ public class Elevator implements Runnable {
         shaftId = updateRequest.getElevatorBId();
         transferPosition = POSITIONS.get(updateRequest.getTransferFloor());
         speed = TWINS_SPEED;
+        long beginTime = 0;
+        if (id == shaftId) {
+            beginTime = printf("UPDATE-BEGIN-%d-%d", elevatorId, shaftId);
+        }
         try {
             updateBarriers.get(shaftId).await();
         } catch (InterruptedException | BrokenBarrierException e) {
@@ -223,15 +230,22 @@ public class Elevator implements Runnable {
             positions.removeIf(position -> position < transferPosition);
             position = transferPosition + 1;
         } else if (id == shaftId) {
-            printf("UPDATE-BEGIN-%d-%d", elevatorId, shaftId);
             twinsId = elevatorId;
             positions.removeIf(position -> position > transferPosition);
             position = transferPosition - 1;
-            delay(MIN_UPDATE_TIME);
-            printf("UPDATE-END-%d-%d", elevatorId, shaftId);
-            Monitor.instance.decreaseRequestCount();
         }
+        scanQueue.addAll(receiveSet);
+        receiveSet.clear();
         dispatchQueues.get(id).remove(updateRequest);
+        Monitor.instance.signalForDispatch();
+        if (id == shaftId) {
+            long pauseTime = MIN_UPDATE_TIME - (System.currentTimeMillis() - beginTime);
+            if (pauseTime > 0) {
+                delay(pauseTime);
+            }
+            Monitor.instance.decreaseRequestCount();
+            printf("UPDATE-END-%d-%d", elevatorId, shaftId);
+        }
         try {
             updateBarriers.get(shaftId).await();
         } catch (InterruptedException | BrokenBarrierException e) {
