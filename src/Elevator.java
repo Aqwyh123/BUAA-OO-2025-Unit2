@@ -229,21 +229,19 @@ public class Elevator implements Runnable {
             throw new RuntimeException(e);
         }
         long beginTime = 0;
-        if (id == shaftId) {
-            beginTime = printf("UPDATE-BEGIN-%d-%d", elevatorId, shaftId);
-        }
         if (id == elevatorId) {
             twinsId = shaftId;
             positions.removeIf(position -> position < transferPosition);
             position = transferPosition + 1;
         } else if (id == shaftId) {
+            beginTime = printf("UPDATE-BEGIN-%d-%d", elevatorId, shaftId);
             twinsId = elevatorId;
             positions.removeIf(position -> position > transferPosition);
             position = transferPosition - 1;
         }
         RequestSet invalidSet = dispatchQueues.get(id).stream().filter(request -> {
             if (request instanceof PersonRequest) {
-                return !positions.contains(POSITIONS.get(((PersonRequest) request).getToFloor()));
+                return !positions.contains(POSITIONS.get(((PersonRequest) request).getFromFloor()));
             }
             return false;
         }).collect(Collectors.toCollection(RequestSet::new));
