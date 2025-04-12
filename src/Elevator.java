@@ -158,7 +158,7 @@ public class Elevator implements Runnable {
                 if (position == transferPosition) {
                     int toDirection = id == shaftId ? -1 : 1;
                     if (toDirection != direction) {
-                        execute(new TurnTask(Integer.signum(toDirection)));
+                        execute(new TurnTask(toDirection));
                     }
                     execute(new MoveTask());
                 }
@@ -178,11 +178,11 @@ public class Elevator implements Runnable {
             Monitor.instance.signalForExecute(twinsId);
             transferLocks.get(shaftId).lock();
         }
+        position = position + direction;
         printf("ARRIVE-%s-%d", FLOORS.get(position), id);
-        if (position == transferPosition) {
+        if (position - direction == transferPosition) {
             transferLocks.get(shaftId).unlock();
         }
-        position = position + direction;
     }
 
     private void executeScheTask(ScheTask scheTask) {
