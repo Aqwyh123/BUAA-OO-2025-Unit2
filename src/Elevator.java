@@ -216,14 +216,14 @@ public class Elevator implements Runnable {
         shaftId = updateRequest.getElevatorBId();
         transferPosition = POSITIONS.get(updateRequest.getTransferFloor());
         speed = TWINS_SPEED;
-        long beginTime = 0;
-        if (id == shaftId) {
-            beginTime = printf("UPDATE-BEGIN-%d-%d", elevatorId, shaftId);
-        }
         try {
             updateBarriers.get(shaftId).await();
         } catch (InterruptedException | BrokenBarrierException e) {
             throw new RuntimeException(e);
+        }
+        long beginTime = 0;
+        if (id == shaftId) {
+            beginTime = printf("UPDATE-BEGIN-%d-%d", elevatorId, shaftId);
         }
         if (id == elevatorId) {
             twinsId = shaftId;
