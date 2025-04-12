@@ -228,7 +228,7 @@ public class Elevator implements Runnable {
         } catch (InterruptedException | BrokenBarrierException e) {
             throw new RuntimeException(e);
         }
-        long beginTime = 0;
+        long beginTime = System.currentTimeMillis();
         if (id == elevatorId) {
             twinsId = shaftId;
             positions.removeIf(position -> position < transferPosition);
