@@ -239,6 +239,11 @@ public class Elevator implements Runnable {
             positions.removeIf(position -> position > transferPosition);
             position = transferPosition - 1;
         }
+        try {
+            updateBarriers.get(shaftId).await();
+        } catch (InterruptedException | BrokenBarrierException e) {
+            throw new RuntimeException(e);
+        }
         RequestSet invalidSet = dispatchQueues.get(id).stream().filter(request -> {
             if (request instanceof PersonRequest) {
                 return !positions.contains(POSITIONS.get(((PersonRequest) request).getFromFloor()));
@@ -251,6 +256,11 @@ public class Elevator implements Runnable {
         dispatchQueues.get(id).removeAll(invalidSet);
         dispatchQueues.get(id).remove(updateRequest);
         Monitor.instance.signalForDispatch();
+        try {
+            updateBarriers.get(shaftId).await();
+        } catch (InterruptedException | BrokenBarrierException e) {
+            throw new RuntimeException(e);
+        }
         if (id == shaftId) {
             Monitor.instance.decreaseRequestCount();
             long pauseTime = MIN_UPDATE_TIME - (System.currentTimeMillis() - beginTime);
