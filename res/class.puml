@@ -1,0 +1,196 @@
+@startuml
+class PauseTask {
+}
+class OpenTask {
+}
+class ScheTask {
+- ScheRequest request
++ <<Create>> ScheTask(ScheRequest)
++ ScheRequest getRequest()
+}
+
+
+class RequestQueue {
++ <<Create>> RequestQueue()
+}
+
+class RequestScanner {
+- RequestQueue scanQueue
++ <<Create>> RequestScanner(RequestQueue)
++ void run()
+}
+
+
+class Scheduler {
++ {static} Task getTask(int,int,boolean,RequestQueue,RequestSet,RequestSet)
+- {static} boolean hasIn(int,int,RequestSet,RequestSet)
+- {static} boolean hasOut(int,RequestSet)
+- {static} int getNewDirection(int,RequestSet)
+- {static} RequestSet getIn(int,int,int,RequestSet)
+- {static} RequestSet getOut(int,RequestSet)
+}
+
+class ReceiveTask {
+}
+interface Task {
+}
+class Dispatcher {
+- int index
+- RequestQueue scanQueue
+- HashMap<Integer,RequestQueue> dispatchQueues
+~ <<Create>> Dispatcher(RequestQueue,HashMap<Integer,RequestQueue>)
++ void run()
+- int dispatch(Request)
+}
+
+
+class OutTask {
+- RequestSet outSet
++ <<Create>> OutTask(RequestSet)
++ RequestSet getOut()
+}
+
+
+class RequestComparator {
+- {static} int MAX_PRIORITY
+- {static} int MIN_PRIORITY
++ {static} Comparator<Request> priorityComparator
++ {static} ConcurrentHashMap<Request,Long> timeMap
+- <<Create>> RequestComparator()
+}
+
+
+class RequestComparator$PriorityComparator {
++ int compare(Request,Request)
+}
+
+class InTask {
+- RequestSet inSet
++ <<Create>> InTask(RequestSet)
++ RequestSet getIn()
+}
+
+
+class MainClass {
++ {static} int[] IDS
++ {static} void main(String[])
+}
+
+
+class Elevator {
++ {static} List<String> FLOORS
++ {static} Map<String,Integer> POSITIONS
+- {static} String INITIAL_FLOOR
+- {static} boolean INITIAL_DOOR_STATE
++ {static} long MIN_DOOR_PAUSE_TIME
++ {static} long MIN_SCHE_STOP_TIME
++ {static} long RATED_SPEED
++ {static} int RATED_LOAD
+- int id
+- int position
+- int direction
+- long lastOpenTime
+- boolean doorState
+- RequestQueue scanQueue
+- RequestQueue dispatchQueue
+- RequestSet receiveSet
+- RequestSet takeSet
++ <<Create>> Elevator(int,RequestQueue,RequestQueue)
++ void run()
+- void delay(long)
+- long output(String)
+- void execute(Task)
+- void executeScheTask(ScheTask)
+}
+
+
+class CloseTask {
+- long pauseTime
++ <<Create>> CloseTask(long)
++ long getPauseTime()
+}
+
+
+class MoveTask {
+- long speed
++ <<Create>> MoveTask(long)
++ long getSpeed()
+}
+
+
+class RequestSet {
++ <<Create>> RequestSet()
+}
+
+class TurnTask {
+- int direction
++ <<Create>> TurnTask(int)
++ int getDirection()
+}
+
+
+class Monitor {
++ {static} Monitor instance
+- ReentrantLock lock
+- Condition condition
+- AtomicBoolean isScannerEnd
+- AtomicInteger requestCount
+- ReentrantLock dispatchLock
+- Condition dispatchCondition
+- ConcurrentHashMap<Integer,ReentrantLock> elevatorLocks
+- ConcurrentHashMap<Integer,Condition> elevatorConditions
+- <<Create>> Monitor()
++ void run()
++ void setScannerEnd()
++ void increaseRequestCount()
++ void decreaseRequestCount()
+- boolean tryWaitToMonitor()
+- void signalForMonitor()
++ boolean tryWaitToDispatch()
++ void signalForDispatch()
++ boolean tryWaitToExecute(int)
++ void signalForExecute(int)
+}
+
+
+
+
+Task <|.. PauseTask
+Task <|.. OpenTask
+Task <|.. ScheTask
+java.util.concurrent.PriorityBlockingQueue <|-- RequestQueue
+Runnable <|.. RequestScanner
+Task <|.. ReceiveTask
+Runnable <|.. Dispatcher
+Task <|.. OutTask
+RequestComparator +.. RequestComparator$PriorityComparator
+Comparator <|.. RequestComparator$PriorityComparator
+Task <|.. InTask
+Runnable <|.. Elevator
+Task <|.. CloseTask
+Task <|.. MoveTask
+java.util.TreeSet <|-- RequestSet
+Task <|.. TurnTask
+Runnable <|.. Monitor
+
+MainClass <.. RequestScanner
+MainClass <.. Dispatcher
+MainClass <.. Elevator
+MainClass <.. Monitor
+
+RequestQueue <.. RequestComparator$PriorityComparator
+RequestSet <.. RequestComparator$PriorityComparator
+
+RequestScanner o-- RequestQueue
+RequestScanner o-- RequestQueue
+Elevator o-- RequestQueue
+Elevator *-- RequestSet
+
+Elevator <.. Scheduler
+Elevator <.. Task
+Scheduler <.. Task
+
+RequestScanner <.. Monitor
+Dispatcher <.. Monitor
+Elevator <.. Monitor
+@enduml
