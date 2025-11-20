@@ -2,12 +2,11 @@ import com.oocourse.elevator1.ElevatorInput;
 import com.oocourse.elevator1.Request;
 
 import java.io.IOException;
-import java.util.concurrent.PriorityBlockingQueue;
 
 public class RequestScanner implements Runnable {
-    private final PriorityBlockingQueue<Request> requests;
+    private final RequestQueue requests;
 
-    public RequestScanner(PriorityBlockingQueue<Request> requests) {
+    public RequestScanner(RequestQueue requests) {
         this.requests = requests;
     }
 

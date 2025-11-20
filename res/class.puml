@@ -1,0 +1,140 @@
+@startuml
+class Dispatcher {
+- RequestQueue scanningQueue
+- HashMap<Integer,RequestQueue> elevatorQueues
++ void run()
+- boolean dispatch(Request)
+}
+
+
+class ProcessingQueue {
+}
+class MoveTask {
+}
+class PauseTask {
+}
+class Door {
+- int id
+- {static} long minPauseTime
+- long openTime
+- boolean doorState
++ boolean getState()
++ void open(String)
++ void close(String)
+}
+
+
+interface Task {
+}
+class Elevator {
++ {static} int[] IDS
++ {static} List<String> FLOORS
++ {static} Map<String,Integer> POSITIONS
+- {static} String INITIAL_FLOOR
+- {static} boolean INITIAL_STATE
+- {static} long RATED_SPEED
++ {static} int RATED_LOAD
+- int id
+- int position
+- int direction
+- Door door
+- RequestQueue waitingQueue
+- ProcessingQueue takingQueue
++ void run()
+- boolean execute(Task)
+}
+
+
+class RequestQueue {
+}
+class TurnTask {
+- int direction
++ int getDirection()
+}
+
+
+class Scheduler {
++ {static} Task getTask(int,int,boolean,RequestQueue,ProcessingQueue)
+- {static} boolean isEnd(RequestQueue,ProcessingQueue)
+- {static} int getNewDirection(int,RequestQueue)
+- {static} boolean hasIn(int,int,RequestQueue,ProcessingQueue)
+- {static} boolean hasOut(int,ProcessingQueue)
+- {static} ArrayList<Request> getIn(int,int,int,RequestQueue)
+- {static} ArrayList<Request> getOut(int,ProcessingQueue)
+}
+
+class MainClass {
++ {static} void main(String[])
+}
+
+class NullRequest {
+}
+class CloseTask {
+}
+class StopTask {
+}
+class RequestComparator {
++ {static} Comparator<Request> priorityComparator
+}
+
+class RequestComparator$PriorityComparator {
++ int compare(Request,Request)
+}
+
+class OpenTask {
+}
+class RequestScanner {
+- RequestQueue requests
++ void run()
+}
+
+
+class OutTask {
+- ArrayList<Request> outQueue
++ ArrayList<Request> getOut()
+}
+
+
+class InTask {
+- ArrayList<Request> inQueue
++ ArrayList<Request> getIn()
+}
+
+
+
+
+Runnable <|.. Dispatcher
+java.util.PriorityQueue <|-- ProcessingQueue
+Task <|.. MoveTask
+Task <|.. PauseTask
+Runnable <|.. Elevator
+java.util.concurrent.PriorityBlockingQueue <|-- RequestQueue
+Task <|.. TurnTask
+com.oocourse.elevator1.Request <|-- NullRequest
+Task <|.. CloseTask
+Task <|.. StopTask
+RequestComparator +.. RequestComparator$PriorityComparator
+Comparator <|.. RequestComparator$PriorityComparator
+Task <|.. OpenTask
+Runnable <|.. RequestScanner
+Task <|.. OutTask
+Task <|.. InTask
+
+MainClass <.. RequestScanner
+MainClass <.. Dispatcher
+MainClass <.. Elevator
+
+Elevator <.. Scheduler
+Elevator *-- Door
+
+RequestQueue <.. RequestComparator$PriorityComparator
+ProcessingQueue <.. RequestComparator$PriorityComparator
+
+RequestScanner o-- RequestQueue
+Dispatcher o-- RequestQueue
+Elevator o-- RequestQueue
+Elevator *-- ProcessingQueue
+
+Elevator <.. Task
+Scheduler <.. Task
+@enduml
