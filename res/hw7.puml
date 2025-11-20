@@ -1,0 +1,215 @@
+@startuml
+class InTask {
+- RequestSet inSet
++ <<Create>> InTask(RequestSet)
++ RequestSet getIn()
+}
+
+
+class PauseTask {
+}
+class TurnTask {
+- int direction
++ <<Create>> TurnTask(int)
++ int getDirection()
+}
+
+
+class Elevator {
++ {static} int[] IDS
++ {static} List<String> FLOORS
++ {static} Map<String,Integer> POSITIONS
+- {static} String INITIAL_FLOOR
+- {static} boolean INITIAL_DOOR_STATE
++ {static} long MIN_DOOR_PAUSE_TIME
+- {static} long MIN_SCHE_DOOR_PAUSE_TIME
+- {static} long MIN_UPDATE_TIME
+- {static} long RATED_SPEED
+- {static} long TWINS_SPEED
++ {static} int RATED_LOAD
+- int id
+- int shaftId
+- int twinsId
+- int transferPosition
+- HashSet<Integer> positions
+- int position
+- int direction
+- long speed
+- long lastOpenTime
+- boolean doorState
+- RequestQueue scanQueue
+- Map<Integer,RequestQueue> dispatchQueues
+- RequestSet receiveSet
+- RequestSet takeSet
+- {static} Map<Integer,CyclicBarrier> updateBarriers
+- {static} Map<Integer,ReentrantLock> transferLocks
++ <<Create>> Elevator(int,RequestQueue,Map<Integer,RequestQueue>)
++ void run()
+- void delay(long)
+- long printf(String,Object)
+- void execute(Task)
+- void executeReceiveTask()
+- void executeMoveTask()
+- void executeScheTask(ScheTask)
+- void executeUpdateTask(UpdateTask)
+}
+
+
+class UpdateTask {
+- UpdateRequest updateRequest
++ <<Create>> UpdateTask(UpdateRequest)
++ UpdateRequest getRequest()
+}
+
+
+class Monitor {
++ {static} Monitor instance
+- ReentrantLock lock
+- Condition condition
+- AtomicBoolean isScannerEnd
+- AtomicInteger requestCount
+- ReentrantLock dispatchLock
+- Condition dispatchCondition
+- ConcurrentHashMap<Integer,ReentrantLock> elevatorLocks
+- ConcurrentHashMap<Integer,Condition> elevatorConditions
+- <<Create>> Monitor()
++ void run()
++ void setScannerEnd()
++ void increaseRequestCount()
++ void decreaseRequestCount()
+- boolean tryAwaitToMonitor()
+- void signalForMonitor()
++ boolean tryAwaitToDispatch()
++ void signalForDispatch()
++ boolean tryAwaitToExecute(int)
++ void signalForExecute(int)
+}
+
+
+class Scheduler {
++ {static} Task getTask(HashSet<Integer>,int,int,int,boolean,RequestQueue,RequestSet,RequestSet)
+- {static} boolean hasIn(int,int,RequestSet,RequestSet)
+- {static} boolean hasOut(HashSet<Integer>,int,int,RequestSet)
+- {static} int getNewDirection(int,RequestSet)
+- {static} RequestSet getIn(int,int,int,RequestSet)
+- {static} RequestSet getOut(HashSet<Integer>,int,int,RequestSet)
+}
+
+class MainClass {
++ {static} void main(String[])
+}
+
+class MoveTask {
+}
+interface Task {
+}
+class ScheTask {
+- ScheRequest request
++ <<Create>> ScheTask(ScheRequest)
++ ScheRequest getRequest()
+}
+
+
+class Dispatcher {
+- int index
+- RequestQueue scanQueue
+- Map<Integer,RequestQueue> dispatchQueues
+- HashMap<Integer,HashSet<Integer>> accessiblePositions
+~ <<Create>> Dispatcher(RequestQueue,Map<Integer,RequestQueue>)
++ void run()
+- void dispatch(Request)
+}
+
+
+class ReceiveTask {
+}
+class OpenTask {
+}
+class RequestQueue {
++ <<Create>> RequestQueue()
+}
+
+class CloseTask {
+- long pauseTime
++ <<Create>> CloseTask(long)
++ long getPauseTime()
+}
+
+
+class RequestScanner {
+- RequestQueue scanQueue
++ <<Create>> RequestScanner(RequestQueue)
++ void run()
+}
+
+
+class RequestComparator {
+- {static} int MAX_PRIORITY
+- {static} int MIN_PRIORITY
++ {static} Comparator<Request> priorityComparator
++ {static} ConcurrentHashMap<Request,Long> timeMap
+- <<Create>> RequestComparator()
+}
+
+
+class RequestComparator$PriorityComparator {
++ int compare(Request,Request)
+- int getPriority(Request)
+}
+
+class OutTask {
+- RequestSet outSet
++ <<Create>> OutTask(RequestSet)
++ RequestSet getOut()
+}
+
+
+class RequestSet {
++ <<Create>> RequestSet()
+}
+
+class TransferRequest {
+}
+
+
+Task <|.. InTask
+Task <|.. PauseTask
+Task <|.. TurnTask
+Runnable <|.. Elevator
+Task <|.. UpdateTask
+Runnable <|.. Monitor
+Task <|.. MoveTask
+Task <|.. ScheTask
+Runnable <|.. Dispatcher
+Task <|.. ReceiveTask
+Task <|.. OpenTask
+java.util.concurrent.PriorityBlockingQueue <|-- RequestQueue
+Task <|.. CloseTask
+Runnable <|.. RequestScanner
+RequestComparator +.. RequestComparator$PriorityComparator
+Comparator <|.. RequestComparator$PriorityComparator
+Task <|.. OutTask
+java.util.TreeSet <|-- RequestSet
+com.oocourse.elevator3.Request <|-- TransferRequest
+
+MainClass <.. RequestScanner
+MainClass <.. Dispatcher
+MainClass <.. Elevator
+MainClass <.. Monitor
+
+RequestQueue <.. RequestComparator$PriorityComparator
+RequestSet <.. RequestComparator$PriorityComparator
+
+RequestScanner o-- RequestQueue
+Dispatcher o-- RequestQueue
+Elevator o-- RequestQueue
+Elevator *-- RequestSet
+
+Elevator <.. Scheduler
+Elevator <.. Task
+Scheduler <.. Task
+
+RequestScanner <.. Monitor
+Dispatcher <.. Monitor
+Elevator <.. Monitor
+@enduml

@@ -1,7 +1,6 @@
 import com.oocourse.elevator3.PersonRequest;
 import com.oocourse.elevator3.Request;
 import com.oocourse.elevator3.ScheRequest;
-import com.oocourse.elevator3.TimableOutput;
 import com.oocourse.elevator3.UpdateRequest;
 
 import java.util.Arrays;
@@ -11,8 +10,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
@@ -34,8 +31,8 @@ public class Elevator implements Runnable {
     private final int id;
     private int shaftId;
     private int twinsId = -1;
-    private final HashSet<Integer> positions = new HashSet<>(POSITIONS.values());
     private int transferPosition = -1;
+    private final HashSet<Integer> positions = new HashSet<>(POSITIONS.values());
 
     private int position = POSITIONS.get(INITIAL_FLOOR);
     private int direction = 0;
@@ -84,31 +81,23 @@ public class Elevator implements Runnable {
         }
     }
 
-    private void delay(long time) {
-        LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(time));
-    }
-
-    private long printf(String s, Object... args) {
-        return TimableOutput.println(String.format(s, args));
-    }
-
     private void execute(Task task) {
         if (task instanceof OpenTask) {
-            lastOpenTime = printf("OPEN-%s-%d", FLOORS.get(position), id);
+            lastOpenTime = Utils.printf("OPEN-%s-%d", FLOORS.get(position), id);
             doorState = true;
         } else if (task instanceof CloseTask) {
             CloseTask closeTask = (CloseTask) task;
             long pauseTime = closeTask.getPauseTime() - (System.currentTimeMillis() - lastOpenTime);
             if (pauseTime > 0) {
-                delay(pauseTime);
+                Utils.sleep(pauseTime);
             }
-            printf("CLOSE-%s-%d", FLOORS.get(position), id);
+            Utils.printf("CLOSE-%s-%d", FLOORS.get(position), id);
             doorState = false;
         } else if (task instanceof InTask) {
             RequestSet inSet = ((InTask) task).getIn();
             for (Request request : inSet) {
                 int personId = ((PersonRequest) request).getPersonId();
-                printf("IN-%d-%s-%d", personId, FLOORS.get(position), id);
+                Utils.printf("IN-%d-%s-%d", personId, FLOORS.get(position), id);
             }
             inSet.forEach(receiveSet::remove);
             takeSet.addAll(inSet);
@@ -117,10 +106,10 @@ public class Elevator implements Runnable {
             for (Request request : outSet) {
                 int personId = ((PersonRequest) request).getPersonId();
                 if (position == POSITIONS.get(((PersonRequest) request).getToFloor())) {
-                    printf("OUT-S-%d-%s-%d", personId, FLOORS.get(position), id);
+                    Utils.printf("OUT-S-%d-%s-%d", personId, FLOORS.get(position), id);
                     Monitor.instance.decreaseRequestCount();
                 } else {
-                    printf("OUT-F-%d-%s-%d", personId, FLOORS.get(position), id);
+                    Utils.printf("OUT-F-%d-%s-%d", personId, FLOORS.get(position), id);
                     int priority = ((PersonRequest) request).getPriority();
                     String fromFloor = Elevator.FLOORS.get(position);
                     String toFloor = ((PersonRequest) request).getToFloor();
@@ -153,7 +142,7 @@ public class Elevator implements Runnable {
         RequestSet finishSet = new RequestSet();
         for (Request request : dispatchQueues.get(id)) {
             if (request instanceof PersonRequest) {
-                printf("RECEIVE-%d-%d", ((PersonRequest) request).getPersonId(), id);
+                Utils.printf("RECEIVE-%d-%d", ((PersonRequest) request).getPersonId(), id);
                 receiveSet.add(request);
             } else if (request instanceof TransferRequest) {
                 if (position == transferPosition) {
@@ -175,7 +164,7 @@ public class Elevator implements Runnable {
 
     private void executeMoveTask() {
         if (position + direction != transferPosition || transferLocks.get(shaftId).tryLock()) {
-            delay(speed);
+            Utils.sleep(speed);
         } else {
             TransferRequest transferRequest = new TransferRequest();
             RequestComparator.timeMap.put(transferRequest, System.nanoTime());
@@ -185,11 +174,11 @@ public class Elevator implements Runnable {
             transferLocks.get(shaftId).lock();
             long pauseTime = speed - (System.currentTimeMillis() - lockTime);
             if (pauseTime > 0) {
-                delay(pauseTime);
+                Utils.sleep(pauseTime);
             }
         }
         position = position + direction;
-        printf("ARRIVE-%s-%d", FLOORS.get(position), id);
+        Utils.printf("ARRIVE-%s-%d", FLOORS.get(position), id);
         if (position - direction == transferPosition) {
             transferLocks.get(shaftId).unlock();
         }
@@ -197,7 +186,7 @@ public class Elevator implements Runnable {
 
     private void executeScheTask(ScheTask scheTask) {
         ScheRequest scheRequest = scheTask.getRequest();
-        printf("SCHE-BEGIN-%d", id);
+        Utils.printf("SCHE-BEGIN-%d", id);
         int toPosition = POSITIONS.get(scheRequest.getToFloor());
         execute(new TurnTask(Integer.signum(toPosition - position)));
         long originSpeed = speed;
@@ -214,7 +203,7 @@ public class Elevator implements Runnable {
         Monitor.instance.decreaseRequestCount();
         Monitor.instance.signalForDispatch();
         execute(new CloseTask(MIN_SCHE_DOOR_PAUSE_TIME));
-        printf("SCHE-END-%d", id);
+        Utils.printf("SCHE-END-%d", id);
     }
 
     private void executeUpdateTask(UpdateTask updateTask) {
@@ -234,7 +223,7 @@ public class Elevator implements Runnable {
             positions.removeIf(position -> position < transferPosition);
             position = transferPosition + 1;
         } else if (id == shaftId) {
-            beginTime = printf("UPDATE-BEGIN-%d-%d", elevatorId, shaftId);
+            beginTime = Utils.printf("UPDATE-BEGIN-%d-%d", elevatorId, shaftId);
             twinsId = elevatorId;
             positions.removeIf(position -> position > transferPosition);
             position = transferPosition - 1;
@@ -265,9 +254,9 @@ public class Elevator implements Runnable {
             Monitor.instance.decreaseRequestCount();
             long pauseTime = MIN_UPDATE_TIME - (System.currentTimeMillis() - beginTime);
             if (pauseTime > 0) {
-                delay(pauseTime);
+                Utils.sleep(pauseTime);
             }
-            printf("UPDATE-END-%d-%d", elevatorId, shaftId);
+            Utils.printf("UPDATE-END-%d-%d", elevatorId, shaftId);
         }
         try {
             updateBarriers.get(shaftId).await();

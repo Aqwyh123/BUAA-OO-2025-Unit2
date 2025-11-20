@@ -1,0 +1,78 @@
+@startuml
+skinparam style strictuml
+
+Participant Main
+Participant Monitor
+Queue RequestQueue
+Participant RequestScanner
+Participant ElevatorInput
+Participant Dispatcher
+Participant Elevator
+collections RequestSet
+Participant Scheduler
+
+activate Main
+
+activate Monitor
+Main --> Monitor : start()
+loop
+    Monitor --> Monitor : tryAwaitToMonitor()
+    alt !isEnd()
+        loop ids
+            Monitor --> Monitor : signalForExecute(id)
+        end
+    else
+        Monitor --> Main : end()
+        destroy Monitor
+    end
+end
+
+create RequestQueue
+Main --> RequestQueue : new()
+Main --> RequestScanner : start()
+activate RequestScanner
+loop
+    RequestScanner --> ElevatorInput : nextRequest()
+    alt request != null
+        RequestScanner --> RequestQueue : put()
+        RequestScanner --> Monitor : increaseRequestCount()
+        RequestScanner --> Monitor : signalForDispatch()
+    else
+        RequestScanner --> Monitor : setScannerEnd()
+        RequestScanner --> Main : end()
+        destroy RequestScanner
+    end
+end
+deactivate RequestScanner
+
+Main --> Dispatcher : start()
+activate Dispatcher
+loop
+    Dispatcher --> RequestQueue : poll()
+    alt request != null
+        Dispatcher --> Dispatcher : dispatch()
+        Dispatcher --> Monitor : signalForExecute()
+    else
+        RequestScanner --> Monitor : tryAwaitToDispatch()
+        alt isEnd()
+            Dispatcher --> Main : end()
+            destroy Dispatcher
+        end
+    end
+end
+
+Main --> Elevator : start()
+activate Elevator
+create RequestSet
+Elevator --> RequestSet : new()
+loop
+    Elevator --> Scheduler : getTask()
+    Elevator --> Elevator : executeTask()
+    alt isEnd()
+        Elevator --> Main : end()
+        destroy Elevator
+    end
+end
+
+deactivate Main
+@enduml
